@@ -21,5 +21,30 @@
 go.work
 go.work.sum
 
-# env file
-.env
+## OS generated files
+**/*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.tmp
+*.bak
+*.swp
+
+## IDE files
+RemoteSystemsTempFiles
+.classpath
+.project
+.settings
+.idea
+.metadata
+*.iml
+*.ipr
+*.log
+.vscode
+!/.vscode/tasks.json
+!/.vscode/launch.json
+!/.vscode/extensions.json

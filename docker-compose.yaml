@@ -1,0 +1,29 @@
+services:
+
+  basic-auth-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64
+        - linux/arm/v5
+        - linux/arm/v6
+        - linux/arm/v7
+        - linux/ppc64le
+        - linux/s390x
+        - linux/riscv64
+        - linux/386
+        - windows/amd64
+        - windows/386
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unspecified}
+      x-bake:
+        tags:
+        - arulrajnet/basic-auth-proxy:dev
+        - arulrajnet/basic-auth-proxy:${GIT_COMMIT:-dev}
+        - arulrajnet/basic-auth-proxy:${CUSTOM_TAG_NAME:-dev}
+    image: arulrajnet/basic-auth-proxy:dev
+    command: basic-auth-proxy
+    environment:
+      LOG_LEVEL: debug
