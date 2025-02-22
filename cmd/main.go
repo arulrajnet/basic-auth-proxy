@@ -8,7 +8,7 @@ import (
 
     log "github.com/arulrajnet/basic-auth-proxy/pkg/logger"
     "github.com/arulrajnet/basic-auth-proxy/pkg/version"
-    "github.com/arulrajnet/basic-auth-proxy/pkg"
+    "github.com/arulrajnet/basic-auth-proxy/pkg/app"
     "github.com/joho/godotenv"
     "github.com/spf13/pflag"
 )
@@ -36,8 +36,8 @@ func main() {
     serverPort := os.Getenv("PORT")
     router := http.NewServeMux()
 
-    router.HandleFunc("/", pkg.SignInPageHandler)
-    router.HandleFunc("/sign_in", pkg.SignInPageHandler)
+    router.HandleFunc("/", app.SignInPageHandler)
+    router.HandleFunc("/sign_in", app.SignInPageHandler)
 
     logger.Info().Msgf("Listening on port: %s", serverPort)
     err = http.ListenAndServe(fmt.Sprintf("0.0.0.0:%s", serverPort), router)

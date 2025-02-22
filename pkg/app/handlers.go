@@ -1,4 +1,4 @@
-package pkg
+package app
 
 import (
     "encoding/base64"
@@ -12,7 +12,7 @@ import (
 )
 
 func SignInPageHandler(w http.ResponseWriter, r *http.Request) {
-    tmplPath := "pkg/sign_in.html"
+    tmplPath := "pkg/app/sign_in.html"
     tmpl, err := template.ParseFiles(tmplPath)
     if err != nil {
         http.Error(w, "Unable to load template", http.StatusInternalServerError)
@@ -30,12 +30,10 @@ func SignInPageHandler(w http.ResponseWriter, r *http.Request) {
     data := struct {
         BrandName   string
         Logo        template.HTML
-        ProxyPrefix string
         ErrorMessage string
     }{
         BrandName:   brandName,
         Logo:        template.HTML(logoData),
-        ProxyPrefix: "",
         ErrorMessage: "",
     }
 
