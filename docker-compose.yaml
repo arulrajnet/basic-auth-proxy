@@ -27,3 +27,6 @@ services:
     command: basic-auth-proxy
     environment:
       LOG_LEVEL: debug
+      LOGO_PATH: "/logo.png"
+      BRAND_NAME: "BRAND_NAME"
+      PORT: "8080"
