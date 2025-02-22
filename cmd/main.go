@@ -36,6 +36,7 @@ func main() {
     serverPort := os.Getenv("PORT")
     router := http.NewServeMux()
 
+    router.HandleFunc("/", pkg.SignInPageHandler)
     router.HandleFunc("/sign_in", pkg.SignInPageHandler)
 
     logger.Info().Msgf("Listening on port: %s", serverPort)
