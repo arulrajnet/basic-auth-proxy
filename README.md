@@ -4,10 +4,10 @@
 
 Key Features:
 
-✅ Brandable Login Screen – Customize the UI to match your brand.
-✅ Session Management – Convert Basic Auth into session-based authentication.
-✅ Secure Reverse Proxy – Acts as a gateway to upstream services with Basic Auth.
-✅ Improved User Experience – Eliminates the need for users to enter credentials repeatedly.
-✅ Seamless Integration – Drop-in replacement for services requiring Basic Auth.
+* Brandable Login Screen – Customize the UI to match your brand.
+* Session Management – Convert Basic Auth into session-based authentication.
+* Secure Reverse Proxy – Acts as a gateway to upstream services with Basic Auth.
+* Improved User Experience – Eliminates the need for users to enter credentials repeatedly.
+* Seamless Integration – Drop-in replacement for services requiring Basic Auth.
 
 Ideal for teams looking to modernize authentication without modifying upstream applications.
