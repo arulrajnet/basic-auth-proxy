@@ -9,6 +9,10 @@ BINERY=basic-auth-proxy
 .PHONY: all
 all: build
 
+.PHONY: run
+run: build
+	$(OUTPUT_DIR)/$(BINERY) -config=./config.yaml
+
 .PHONY: build
 build: clean build_linux_amd64 build_linux_arm build_windows_amd64
 
