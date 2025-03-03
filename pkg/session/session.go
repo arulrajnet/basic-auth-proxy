@@ -1,11 +1,11 @@
 package session
 
 import (
-	"net/http"
 	"encoding/base64"
+	"net/http"
 
-	"github.com/gorilla/sessions"
 	"github.com/gorilla/securecookie"
+	"github.com/gorilla/sessions"
 )
 
 type SessionManager struct {

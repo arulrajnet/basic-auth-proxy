@@ -1,9 +1,10 @@
 package proxy
 
 import (
-	"os"
-	"gopkg.in/yaml.v3"
 	"fmt"
+	"os"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Config defines the structure of the configuration file.
