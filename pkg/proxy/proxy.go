@@ -167,60 +167,105 @@ const loginTemplate = `
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}}</title>
-	<style>
-		body {
-			font-family: sans-serif;
-			background-color: #f0f0f0;
-			display: flex;
-			justify-content: center;
-			align-items: center;
-			height: 100vh;
-			margin: 0;
-		}
-		.login-container {
-			background-color: #fff;
-			padding: 20px;
-			border-radius: 8px;
-			box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-			width: 300px;
-			text-align: center;
-		}
-		input[type="text"],
-		input[type="password"] {
-			width: 100%;
-			padding: 10px;
-			margin: 10px 0;
-			border: 1px solid #ddd;
-			border-radius: 4px;
-			box-sizing: border-box;
-		}
-		button {
-			background-color: #5cb85c;
-			color: white;
-			padding: 10px 15px;
-			border: none;
-			border-radius: 4px;
-			cursor: pointer;
-		}
-		button:hover {
-			background-color: #4cae4c;
-		}
-		.logo {
-			max-width: 150px;
-			margin-bottom: 20px;
-		}
-		{{.CustomCSS}}
-	</style>
+    <style>
+        body {
+            background-color: #f7f7f7;
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .login-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 100%;
+            padding: 2rem;
+            text-align: center;
+        }
+        .login-container h1 {
+            font-size: 2rem;
+            color: #333;
+            margin-bottom: 1rem;
+        }
+        .logo {
+            margin: 2rem 0;
+        }
+        .logo img {
+            max-width: 120px;
+            margin: 0 auto;
+        }
+        .field {
+            margin-bottom: 1.5rem;
+        }
+        .input {
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            padding: 0.75rem;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .button.is-primary {
+            background-color: #3273dc;
+            color: white;
+            width: 100%;
+            padding: 1rem;
+            border-radius: 4px;
+            font-size: 1.1rem;
+            transition: background-color 0.3s ease;
+            margin-top: 1rem;
+        }
+        .button.is-primary:hover {
+            background-color: #276fa3;
+        }
+        footer {
+            text-align: center;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: #555;
+        }
+        footer a {
+            color: #3273dc;
+            text-decoration: none;
+        }
+        {{.CustomCSS}}
+    </style>
 </head>
 <body>
     <div class="login-container">
-        {{if .Logo}}<img src="{{.Logo}}" alt="Logo" class="logo">{{end}}
-        <h2>{{.Title}}</h2>
+        {{ if .Title }}
+            <h1>{{ .Title }}</h1>
+        {{ end }}
+        {{ if .Logo }}
+            <div class="logo">
+                <img src="{{.Logo}}" alt="Logo">
+            </div>
+        {{ end }}
         <form action="/login" method="post">
-            <input type="text" name="username" placeholder="Username" required>
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit">Login</button>
+            <div class="field">
+                <label class="label has-text-weight-bold">Username</label>
+                <div class="control">
+                    <input class="input" type="text" name="username" placeholder="Username" required>
+                </div>
+            </div>
+            <div class="field">
+                <label class="label has-text-weight-bold">Password</label>
+                <div class="control">
+                    <input class="input" type="password" name="password" placeholder="Password" required>
+                </div>
+            </div>
+            <div class="field">
+                <div class="control">
+                    <button class="button is-primary" type="submit">Sign In</button>
+                </div>
+            </div>
         </form>
     </div>
 </body>
