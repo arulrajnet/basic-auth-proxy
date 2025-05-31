@@ -1,5 +1,6 @@
 # Docker multi-stage build
-FROM --platform=${BUILDPLATFORM} golang:1.24.0-bookworm AS base
+# Set the BUILDPLATFORM as linux/amd64 and get the TARGETPLATFORM from build args
+FROM --platform=linux/amd64 golang:1.24.0-bookworm AS base
 
 ARG GIT_COMMIT=unspecified
 ARG BUILD_IMAGE_ID=unspecified
