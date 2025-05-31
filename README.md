@@ -1,6 +1,6 @@
 # BasicAuth Proxy
 
-**BasicAuth-Proxy** is a lightweight, brandable reverse proxy designed to handle authentication for upstream services that use Basic Auth. Instead of exposing Basic Auth directly to users—along with its inherent security and usability drawbacks—this proxy provides a customizable login screen, session management, and improved security.
+**BasicAuth-Proxy** is a brandable, lightweight reverse proxy designed to modernize and secure legacy applications that rely on HTTP Basic Authentication. By introducing an authentication layer that issues session-based credentials, the proxy mitigates many of the inherent risks and usability challenges associated with exposing Basic Auth directly to end users.
 
 ### Key Features:
 
@@ -13,6 +13,8 @@
 Ideal for teams looking to modernize authentication without modifying upstream applications.
 
 ### Architecture
+
+![basic-auth-proxy.drawio.png](basic-auth-proxy.drawio.png)
 
 The following diagram illustrates how BasicAuth Proxy works:
 
