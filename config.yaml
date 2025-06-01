@@ -1,23 +1,40 @@
 proxy:
   address: "0.0.0.0"
   port: 8080
+  timeout: 30  # Timeout in seconds
 
 upstreams:
   - name: "example"
     host: "http://localhost:8081"
     auth_user: "testuser"
     auth_pass: "testpassword"
+    timeout: 30  # Timeout in seconds for this upstream
 
 session:
   name: "basic_auth_proxy_session"
-  secret_key: "super-secret-key"
+  secret_key: "super-secret-key-change-me-in-production"
   domain: "localhost"
   max_age: 86400 # 24 hours
   secure: false
   http_only: true
   same_site: "lax"
 
+cookie:
+  name: "basic_auth_proxy_auth"
+  secret_key: "super-secret-key-change-me-in-production"
+  domain: "localhost"
+  path: "/"
+  secure: false
+  http_only: true
+  max_age: 86400 # 24 Hours
+  same_site: "lax"
+
 login_page:
   title: "Basic Auth Proxy Login"
-  logo: ""
+  logo: "https://via.placeholder.com/120x60?text=Logo"
   custom_css: ""
+  template_path: ""  # Leave empty to use the default template
+
+log_level: "info"
+proxy_path: "/"  # Set to empty or "/" for no prefix
+footer_text: "Powered by ProxyAuth"  # Leave empty for default footer

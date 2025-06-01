@@ -4,6 +4,7 @@ set -o errexit
 # set -x
 
 BINARY=${BINARY:-basic-auth-proxy}
+VERSION=${VERSION:-$(git describe --tags --always --dirty)}
 
 if [[ -z ${BINARY} ]] || [[ -z ${VERSION} ]]; then
   echo "Missing required env var: BINARY=X VERSION=X $(basename $0)"
