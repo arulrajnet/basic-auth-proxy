@@ -31,35 +31,33 @@ func main() {
 	}
 
 	cfg, err := proxy.LoadConfig(*configFile)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("Failed to load configuration")
+		os.Exit(1)
+	}
 
+	sessionManager := session.NewSessionManager(cfg.Session.SecretKey)
 
+	r := mux.NewRouter()
 
+	// Login handler
+	r.HandleFunc("/login", proxy.LoginPageHandler(&cfg.LoginPage, sessionManager)).Methods("GET")
+	r.HandleFunc("/login", proxy.LoginHandler(cfg, sessionManager)).Methods("POST")
 
+	// Proxy handler
+	r.PathPrefix("/").Handler(proxy.NewProxy(cfg, sessionManager))
 
+	logger.Info().Msg("Starting basic-auth-proxy")
+	addr := fmt.Sprintf("%s:%d", cfg.Proxy.Address, cfg.Proxy.Port)
+	logger.Info().Msgf("Listening on %s", addr)
 
+	server := &http.Server{
+		Addr:    addr,
+		Handler: r,
+	}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}	}		os.Exit(1)		logger.Fatal().Err(err).Msg("Failed to start server")	if err := server.ListenAndServe(); err != nil {	}		Handler: r,		Addr:    addr,	server := &http.Server{	logger.Info().Msgf("Listening on %s", addr)	addr := fmt.Sprintf("%s:%d", cfg.Proxy.Address, cfg.Proxy.Port)	logger.Info().Msg("Starting basic-auth-proxy")	r.PathPrefix("/").Handler(proxy.NewProxy(cfg, sessionManager))	// Proxy handler	r.HandleFunc("/login", proxy.LoginHandler(cfg, sessionManager)).Methods("POST")	r.HandleFunc("/login", proxy.LoginPageHandler(cfg.LoginPage, sessionManager)).Methods("GET")	//  Login handler	r := mux.NewRouter()	sessionManager := session.NewSessionManager(cfg.Session.SecretKey)	}		os.Exit(1)		logger.Fatal().Err(err).Msg("Failed to load configuration")	if err != nil {
+	if err := server.ListenAndServe(); err != nil {
+		logger.Fatal().Err(err).Msg("Failed to start server")
+		os.Exit(1)
+	}
+}

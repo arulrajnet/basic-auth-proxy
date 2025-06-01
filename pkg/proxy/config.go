@@ -9,25 +9,15 @@ import (
 
 // Config defines the structure of the configuration file.
 type Config struct {
-	Proxy struct {
-		Address string `yaml:"address"`
-		Port    int    `yaml:"port"`
-	} `yaml:"proxy"`
-	Upstreams []Upstream `yaml:"upstreams"`
-	Session struct {
-		Name string `yaml:"name"`
-		SecretKey string `yaml:"secret_key"`
-		Domain string `yaml:"domain"`
-		MaxAge int `yaml:"max_age"`
-		Secure bool `yaml:"secure"`
-		HttpOnly bool `yaml:"http_only"`
-		SameSite string `yaml:"same_site"`
-	} `yaml:"session"`
-	LoginPage struct {
-		Title string `yaml:"title"`
-		Logo string `yaml:"logo"`
-		CustomCSS string `yaml:"custom_css"`
-	} `yaml:"login_page"`
+	Proxy    ProxyConfig  `yaml:"proxy"`
+	Upstreams []Upstream  `yaml:"upstreams"`
+	Session  Session      `yaml:"session"`
+	LoginPage LoginPage   `yaml:"login_page"`
+}
+
+type ProxyConfig struct {
+	Address string `yaml:"address"`
+	Port    int    `yaml:"port"`
 }
 
 // Upstream defines the structure for each upstream service.
@@ -36,6 +26,22 @@ type Upstream struct {
 	Host     string `yaml:"host"`
 	AuthUser string `yaml:"auth_user"`
 	AuthPass string `yaml:"auth_pass"`
+}
+
+type Session struct {
+	Name string `yaml:"name"`
+	SecretKey string `yaml:"secret_key"`
+	Domain string `yaml:"domain"`
+	MaxAge int `yaml:"max_age"`
+	Secure bool `yaml:"secure"`
+	HttpOnly bool `yaml:"http_only"`
+	SameSite string `yaml:"same_site"`
+}
+
+type LoginPage struct {
+	Title     string `yaml:"title"`
+	Logo      string `yaml:"logo"`
+	CustomCSS string `yaml:"custom_css"`
 }
 
 // LoadConfig loads the configuration from the specified file path.

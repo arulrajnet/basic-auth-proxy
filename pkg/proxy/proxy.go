@@ -50,7 +50,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// Set the Authorization header from the session
 		if authUser, ok := session.Values["auth_user"].(string); ok {
 			if authPass, ok := session.Values["auth_pass"].(string); ok {
-				auth := session.GenerateBasicAuth(authUser, authPass)
+				auth := p.sessionManager.GenerateBasicAuth(authUser, authPass)
 				req.Header.Set("Authorization", auth)
 			}
 		}
@@ -139,7 +139,7 @@ type LoginPageData struct {
 	CustomCSS string
 }
 
-func LoginPageHandler(config LoginPage, sessionManager *session.SessionManager) http.HandlerFunc {
+func LoginPageHandler(config *LoginPage, sessionManager *session.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tmpl, err := template.New("login").Parse(loginTemplate)
 		if err != nil {
@@ -149,8 +149,8 @@ func LoginPageHandler(config LoginPage, sessionManager *session.SessionManager) 
 		}
 
 		data := LoginPageData{
-			Title: config.Title,
-			Logo: config.Logo,
+			Title:     config.Title,
+			Logo:      config.Logo,
 			CustomCSS: config.CustomCSS,
 		}
 

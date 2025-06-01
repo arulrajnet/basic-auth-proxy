@@ -25,7 +25,7 @@ func (m *SessionManager) Get(r *http.Request, name string) (*sessions.Session, e
 	return m.store.Get(r, name)
 }
 
-func (s *sessions.Session) GenerateBasicAuth(username, password string) string {
+func (m *SessionManager) GenerateBasicAuth(username, password string) string {
 	auth := username + ":" + password
 	return "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
 }
