@@ -17,7 +17,8 @@ services:
         - windows/amd64
         - windows/386
       args:
-        GIT_COMMIT: ${GIT_COMMIT:-unspecified}
+        GIT_COMMIT: ${GIT_COMMIT:-$(git describe --tags --always --dirty)}
+        VERSION: ${VERSION:-dev}
       x-bake:
         tags:
         - arulrajnet/basic-auth-proxy:dev

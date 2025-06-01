@@ -43,6 +43,10 @@ RUN case ${TARGETPLATFORM} in \
 # Final image
 FROM scratch AS final
 LABEL maintainer="Arulraj V <me@arulraj.net>"
+
+ARG VERSION=unspecified
+ENV VERSION=${VERSION}
+
 COPY --from=base /app/dist/basic-auth-proxy /usr/bin/basic-auth-proxy
 
 LABEL org.opencontainers.image.licenses=MIT \

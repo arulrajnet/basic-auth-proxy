@@ -39,7 +39,7 @@ func NewProxy(config *Config, sessionManager *session.SessionManager) *Proxy {
 	p := &Proxy{
 		config:         config,
 		sessionManager: sessionManager,
-		proxyPrefix:    strings.TrimSuffix(config.ProxyPrefix, "/"),
+		proxyPrefix:    strings.TrimSuffix(config.Proxy.ProxyPrefix, "/"),
 	}
 
 	// Setup reverse proxy to the first upstream
@@ -266,20 +266,16 @@ func (p *Proxy) serveLoginPage(w http.ResponseWriter, r *http.Request) {
 
 	// Data for the template
 	data := struct {
-		Title      string
 		Logo       string
-		CustomCSS  string
 		Year       int
 		Version    string
 		FooterText string
 		Error      string
 	}{
-		Title:      p.config.LoginPage.Title,
-		Logo:       p.config.LoginPage.Logo,
-		CustomCSS:  p.config.LoginPage.CustomCSS,
+		Logo:       p.config.CustomPage.Logo,
 		Year:       time.Now().Year(),
 		Version:    version.VERSION,
-		FooterText: p.config.FooterText,
+		FooterText: p.config.CustomPage.FooterText,
 		Error:      r.URL.Query().Get("error"),
 	}
 
@@ -288,17 +284,12 @@ func (p *Proxy) serveLoginPage(w http.ResponseWriter, r *http.Request) {
 		data.Logo = "https://via.placeholder.com/120x60?text=Logo"
 	}
 
-	// If footer text is empty, use default
-	if data.FooterText == "" {
-		data.FooterText = fmt.Sprintf("Powered by ProxyAuth v%s © %d", version.VERSION, time.Now().Year())
-	}
-
 	// Check if a custom template path is provided
-	if p.config.LoginPage.TemplatePath != "" {
+	if p.config.CustomPage.TemplateDir != "" {
 		// Load template from file
-		tmpl, err = template.ParseFiles(p.config.LoginPage.TemplatePath)
+		tmpl, err = template.ParseFiles(p.config.CustomPage.TemplateDir)
 		if err != nil {
-			logger.Error().Err(err).Str("path", p.config.LoginPage.TemplatePath).Msg("Failed to parse custom login template")
+			logger.Error().Err(err).Str("path", p.config.CustomPage.TemplateDir).Msg("Failed to parse custom login template")
 			// Fall back to default template
 			tmpl, err = template.New("login").Parse(loginTemplate)
 			if err != nil {
@@ -368,124 +359,4 @@ func (p *Proxy) validateCredentials(upstream Upstream, username, password string
 }
 
 // Login page template
-const loginTemplate = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.Title}}</title>
-    <style>
-        body {
-            background-color: #f7f7f7;
-            font-family: 'Roboto', sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        .login-container {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
-            max-width: 400px;
-            width: 100%;
-            padding: 2rem;
-            text-align: center;
-        }
-        .login-container h1 {
-            font-size: 2rem;
-            color: #333;
-            margin-bottom: 1rem;
-        }
-        .logo {
-            margin: 2rem 0;
-        }
-        .logo img {
-            max-width: 120px;
-            margin: 0 auto;
-        }
-        .field {
-            margin-bottom: 1.5rem;
-        }
-        .input {
-            border-radius: 4px;
-            border: 1px solid #ccc;
-            padding: 0.75rem;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        .button.is-primary {
-            background-color: #3273dc;
-            color: white;
-            width: 100%;
-            padding: 1rem;
-            border-radius: 4px;
-            font-size: 1.1rem;
-            transition: background-color 0.3s ease;
-            margin-top: 1rem;
-            border: none;
-            cursor: pointer;
-        }
-        .button.is-primary:hover {
-            background-color: #276fa3;
-        }
-        footer {
-            text-align: center;
-            margin-top: 1rem;
-            font-size: 0.9rem;
-            color: #555;
-        }
-        footer a {
-            color: #3273dc;
-            text-decoration: none;
-        }
-        .error-message {
-            color: #e74c3c;
-            margin-bottom: 1rem;
-            font-size: 0.9rem;
-        }
-        {{.CustomCSS}}
-    </style>
-</head>
-<body>
-    <div class="login-container">
-        {{ if .Title }}
-            <h1>{{ .Title }}</h1>
-        {{ end }}
-        {{ if .Logo }}
-            <div class="logo">
-                <img src="{{.Logo}}" alt="Logo">
-            </div>
-        {{ end }}
-        {{ if .Error }}
-            <div class="error-message">{{ .Error }}</div>
-        {{ end }}
-        <form action="login" method="post">
-            <div class="field">
-                <label class="label has-text-weight-bold">Username</label>
-                <div class="control">
-                    <input class="input" type="text" name="username" placeholder="Username" required>
-                </div>
-            </div>
-            <div class="field">
-                <label class="label has-text-weight-bold">Password</label>
-                <div class="control">
-                    <input class="input" type="password" name="password" placeholder="Password" required>
-                </div>
-            </div>
-            <div class="field">
-                <div class="control">
-                    <button class="button is-primary" type="submit">Sign In</button>
-                </div>
-            </div>
-        </form>
-        <footer>
-            {{ .FooterText }}
-        </footer>
-    </div>
-</body>
-</html>
-`
+const loginTemplate = ""

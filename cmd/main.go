@@ -30,9 +30,8 @@ func main() {
 	upstreamURL := pflag.StringP("upstream", "u", "", "upstream server URL")
 	cookieName := pflag.StringP("cookie-name", "s", "", "cookie name")
 	cookieSecret := pflag.StringP("cookie-secret", "S", "", "cookie secret key")
-	loginTitle := pflag.StringP("login-title", "t", "", "title for the login page")
-	loginLogo := pflag.StringP("login-logo", "L", "", "URL for the login page logo")
-	loginTemplate := pflag.StringP("login-template", "T", "", "path to custom login template")
+	loginLogo := pflag.StringP("logo", "L", "", "Path or URL for the login page logo")
+	templateDir := pflag.StringP("template-dir", "T", "", "path to custom login template")
 	footerText := pflag.StringP("footer-text", "f", "", "footer text for the login page")
 	help := pflag.BoolP("help", "h", false, "show this help message")
 
@@ -70,12 +69,12 @@ func main() {
 	viper.BindPFlag("proxy.prefix", pflag.Lookup("proxy-prefix"))
 	viper.BindPFlag("log_level", pflag.Lookup("log-level"))
 	viper.BindPFlag("upstreams.0.url", pflag.Lookup("upstream"))
+	viper.BindPFlag("upstreams.0.timeout", pflag.Lookup("upstream-timeout"))
 	viper.BindPFlag("cookie.name", pflag.Lookup("cookie-name"))
 	viper.BindPFlag("cookie.secret_key", pflag.Lookup("cookie-secret"))
-	viper.BindPFlag("login_page.title", pflag.Lookup("login-title"))
-	viper.BindPFlag("login_page.logo", pflag.Lookup("login-logo"))
-	viper.BindPFlag("login_page.template_path", pflag.Lookup("login-template"))
-	viper.BindPFlag("footer_text", pflag.Lookup("footer-text"))
+	viper.BindPFlag("custom_page.logo", pflag.Lookup("logo"))
+	viper.BindPFlag("custom_page.template_dir", pflag.Lookup("template-dir"))
+	viper.BindPFlag("custom_page.footer_text", pflag.Lookup("footer-text"))
 
 	// Apply overrides from flags
 	if *address != "" {
@@ -85,11 +84,12 @@ func main() {
 		cfg.Proxy.Port = *port
 	}
 	if *proxyPrefix != "" {
-		cfg.ProxyPrefix = *proxyPrefix
+		cfg.Proxy.ProxyPrefix = *proxyPrefix
 	}
 	if *logLevel != "info" {
 		cfg.LogLevel = *logLevel
 		log.SetLogLevel(cfg.LogLevel)
+	}
 	if *upstreamURL != "" && len(cfg.Upstreams) > 0 {
 		parsedURL, err := url.Parse(*upstreamURL)
 		if err != nil {
@@ -98,24 +98,20 @@ func main() {
 		}
 		cfg.Upstreams[0].URL = parsedURL
 	}
-	}
 	if *cookieName != "" {
 		cfg.Cookie.Name = *cookieName
 	}
 	if *cookieSecret != "" {
 		cfg.Cookie.SecretKey = *cookieSecret
 	}
-	if *loginTitle != "" {
-		cfg.LoginPage.Title = *loginTitle
-	}
 	if *loginLogo != "" {
-		cfg.LoginPage.Logo = *loginLogo
+		cfg.CustomPage.Logo = *loginLogo
 	}
-	if *loginTemplate != "" {
-		cfg.LoginPage.TemplatePath = *loginTemplate
+	if *templateDir != "" {
+		cfg.CustomPage.TemplateDir = *templateDir
 	}
 	if *footerText != "" {
-		cfg.FooterText = *footerText
+		cfg.CustomPage.FooterText = *footerText
 	}
 
 	// Create session manager
@@ -128,9 +124,9 @@ func main() {
 	r := mux.NewRouter()
 
 	// Add routes
-	if cfg.ProxyPrefix != "" && cfg.ProxyPrefix != "/" {
+	if cfg.Proxy.ProxyPrefix != "" && cfg.Proxy.ProxyPrefix != "/" {
 		// Routes with prefix
-		prefix := cfg.ProxyPrefix
+		prefix := cfg.Proxy.ProxyPrefix
 		logger.Info().Str("prefix", prefix).Msg("Using proxy prefix")
 
 		// Add prefixed routes
