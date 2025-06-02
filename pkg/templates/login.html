@@ -1,4 +1,4 @@
-{{define "sign_in.html"}}
+{{define "login.html"}}
 <!DOCTYPE html>
 <html>
 <head>
@@ -16,7 +16,7 @@
             align-items: center;
             height: 100vh;
         }
-        .login-container {
+        .container {
             background: white;
             border-radius: 8px;
             box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
@@ -25,7 +25,7 @@
             padding: 2rem;
             text-align: center;
         }
-        .login-container h1 {
+        .container h1 {
             font-size: 2rem;
             color: #333;
             margin-bottom: 1rem;
@@ -80,7 +80,7 @@
     </style>
 </head>
 <body>
-    <div class="login-container">
+    <div class="container">
         {{ if .Title }}
             <h1>{{ .Title }}</h1>
         {{ end }}
