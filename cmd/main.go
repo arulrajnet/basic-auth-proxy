@@ -122,6 +122,7 @@ func main() {
 
 	// Setup router
 	r := mux.NewRouter()
+	r.Use(proxy.RequestLogger(logger))
 
 	// Add routes
 	if cfg.Proxy.ProxyPrefix != "" && cfg.Proxy.ProxyPrefix != "/" {

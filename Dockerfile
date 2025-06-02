@@ -38,7 +38,7 @@ RUN case ${TARGETPLATFORM} in \
         "windows/386") GOOS=windows GOARCH=386  ;; \
     esac && \
     printf "Building basic-auth-proxy for OS: ${GOOS}, Arch: ${GOARCH}\n" && \
-    GOOS=${GOOS} GOARCH=${GOARCH} VERSION=${VERSION} make build_binary
+    GOOS=${GOOS} GOARCH=${GOARCH} VERSION=${VERSION} make build
 
 # Final image
 FROM scratch AS final
@@ -47,7 +47,7 @@ LABEL maintainer="Arulraj V <me@arulraj.net>"
 ARG VERSION=unspecified
 ENV VERSION=${VERSION}
 
-COPY --from=base /app/dist/basic-auth-proxy /usr/bin/basic-auth-proxy
+COPY --from=base /app/build/basic-auth-proxy /usr/bin/basic-auth-proxy
 
 LABEL org.opencontainers.image.licenses=MIT \
       org.opencontainers.image.description="A Secure and Brandable Reverse Proxy for Upstream Services with Basic Auth." \

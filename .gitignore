@@ -51,3 +51,5 @@ RemoteSystemsTempFiles
 
 # Other files
 release
+build
+dist
