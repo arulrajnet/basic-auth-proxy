@@ -56,6 +56,11 @@ func DefaultConfig() *Config {
 			Timeout: 30,
 			ProxyPrefix: "/auth",
 		},
+		Upstreams: []Upstream{
+			{
+				Timeout: 30,
+			},
+		},
 		CustomPage: CustomPage{
 			Logo:         "https://via.placeholder.com/120x60?text=Logo",
 			TemplateDir:  "",

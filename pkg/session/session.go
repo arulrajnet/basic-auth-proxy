@@ -24,6 +24,7 @@ type SessionManager struct {
 
 type UserInfo struct {
 	Username string    `json:"username"`
+	Password string    `json:"password"`
 	LoggedIn time.Time `json:"logged_in"`
 }
 
@@ -124,6 +125,12 @@ func (m *SessionManager) GetUserInfo(r *http.Request, sessionName string) (*User
 		return nil, fmt.Errorf("username not found in session")
 	}
 
+	// Get password
+	password, ok := session.Values["auth_pass"].(string)
+	if !ok {
+		return nil, fmt.Errorf("password not found in session")
+	}
+
 	// Get login time
 	loginTimeStr, ok := session.Values["logged_in"].(string)
 	if !ok {
@@ -137,6 +144,7 @@ func (m *SessionManager) GetUserInfo(r *http.Request, sessionName string) (*User
 
 	return &UserInfo{
 		Username: username,
+		Password: password,
 		LoggedIn: loginTime,
 	}, nil
 }

@@ -11,6 +11,7 @@ import (
 
 	log "github.com/arulrajnet/basic-auth-proxy/pkg/logger"
 	"github.com/arulrajnet/basic-auth-proxy/pkg/session"
+	"github.com/arulrajnet/basic-auth-proxy/pkg/templates"
 	"github.com/arulrajnet/basic-auth-proxy/pkg/version"
 )
 
@@ -210,10 +211,6 @@ func (p *Proxy) handleSignIn(w http.ResponseWriter, r *http.Request) {
 
 		// Redirect to home or requested path
 		redirectPath := "/"
-		if p.proxyPrefix != "" && p.proxyPrefix != "/" {
-			redirectPath = p.proxyPrefix
-		}
-
 		// Check if there's a redirect URL in the query
 		if redirectURL := r.URL.Query().Get("redirect"); redirectURL != "" {
 			redirectPath = redirectURL
@@ -287,11 +284,11 @@ func (p *Proxy) serveLoginPage(w http.ResponseWriter, r *http.Request) {
 	// Check if a custom template path is provided
 	if p.config.CustomPage.TemplateDir != "" {
 		// Load template from file
-		tmpl, err = template.ParseFiles(p.config.CustomPage.TemplateDir)
+		tmpl, err = template.ParseFiles(p.config.CustomPage.TemplateDir+ "/login.html")
 		if err != nil {
 			logger.Error().Err(err).Str("path", p.config.CustomPage.TemplateDir).Msg("Failed to parse custom login template")
 			// Fall back to default template
-			tmpl, err = template.New("login").Parse(loginTemplate)
+			tmpl, err = template.New("login").Parse(templates.LoginTemplate)
 			if err != nil {
 				logger.Error().Err(err).Msg("Failed to parse default login template")
 				http.Error(w, "Template Error", http.StatusInternalServerError)
@@ -300,7 +297,7 @@ func (p *Proxy) serveLoginPage(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// Use default template
-		tmpl, err = template.New("login").Parse(loginTemplate)
+		tmpl, err = template.New("login").Parse(templates.LoginTemplate)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to parse default login template")
 			http.Error(w, "Template Error", http.StatusInternalServerError)
@@ -357,6 +354,3 @@ func (p *Proxy) validateCredentials(upstream Upstream, username, password string
 	// Check response status code
 	return resp.StatusCode == http.StatusOK, nil
 }
-
-// Login page template
-const loginTemplate = ""
