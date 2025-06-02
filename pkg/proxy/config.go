@@ -11,17 +11,17 @@ import (
 type Config struct {
 	Proxy      ProxyConfig  `yaml:"proxy" mapstructure:"proxy"`
 	Upstreams  []Upstream   `yaml:"upstreams" mapstructure:"upstreams"`
-	CustomPage  CustomPage  `yaml:"custom_page" mapstructure:"custom_page"`
+	CustomPage CustomPage   `yaml:"custom_page" mapstructure:"custom_page"`
 	LogLevel   string       `yaml:"log_level" mapstructure:"log_level"`
 	Version    string       `yaml:"version" mapstructure:"version"`
 	Cookie     CookieConfig `yaml:"cookie" mapstructure:"cookie"`
 }
 
 type ProxyConfig struct {
-	Address string `yaml:"address" mapstructure:"address"`
-	Port    int    `yaml:"port" mapstructure:"port"`
-	Timeout int    `yaml:"timeout" mapstructure:"timeout"` // Timeout in seconds
-	ProxyPrefix  string   `yaml:"prefix" mapstructure:"prefix"`
+	Address     string `yaml:"address" mapstructure:"address"`
+	Port        int    `yaml:"port" mapstructure:"port"`
+	Timeout     int    `yaml:"timeout" mapstructure:"timeout"` // Timeout in seconds
+	ProxyPrefix string `yaml:"prefix" mapstructure:"prefix"`
 }
 
 // Upstream defines the structure for each upstream service.
@@ -31,9 +31,9 @@ type Upstream struct {
 }
 
 type CustomPage struct {
-	Logo         string `yaml:"logo" mapstructure:"logo"`
-	TemplateDir  string `yaml:"template_dir" mapstructure:"template_dir"`
-	FooterText   string `yaml:"footer_text" mapstructure:"footer_text"`
+	Logo        string `yaml:"logo" mapstructure:"logo"`
+	TemplateDir string `yaml:"template_dir" mapstructure:"template_dir"`
+	FooterText  string `yaml:"footer_text" mapstructure:"footer_text"`
 }
 
 type CookieConfig struct {
@@ -51,9 +51,9 @@ type CookieConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Proxy: ProxyConfig{
-			Address: "0.0.0.0",
-			Port:    8080,
-			Timeout: 30,
+			Address:     "0.0.0.0",
+			Port:        8080,
+			Timeout:     30,
 			ProxyPrefix: "/auth",
 		},
 		Upstreams: []Upstream{
@@ -62,11 +62,11 @@ func DefaultConfig() *Config {
 			},
 		},
 		CustomPage: CustomPage{
-			Logo:         "https://via.placeholder.com/120x60?text=Logo",
-			TemplateDir:  "",
-			FooterText:   "",
+			Logo:        "https://via.placeholder.com/120x60?text=Logo",
+			TemplateDir: "",
+			FooterText:  "",
 		},
-		LogLevel:  "info",
+		LogLevel: "info",
 		Cookie: CookieConfig{
 			Name:     "basic_auth_proxy_session",
 			Domain:   "localhost",

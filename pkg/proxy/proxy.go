@@ -284,7 +284,7 @@ func (p *Proxy) serveLoginPage(w http.ResponseWriter, r *http.Request) {
 	// Check if a custom template path is provided
 	if p.config.CustomPage.TemplateDir != "" {
 		// Load template from file
-		tmpl, err = template.ParseFiles(p.config.CustomPage.TemplateDir+ "/login.html")
+		tmpl, err = template.ParseFiles(p.config.CustomPage.TemplateDir + "/login.html")
 		if err != nil {
 			logger.Error().Err(err).Str("path", p.config.CustomPage.TemplateDir).Msg("Failed to parse custom login template")
 			// Fall back to default template
