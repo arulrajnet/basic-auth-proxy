@@ -53,14 +53,17 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Set log level
-	log.SetLogLevel(*logLevel)
-
 	// Load configuration
 	cfg, err := proxy.LoadConfig(*configFile)
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to load configuration")
 		os.Exit(1)
+	}
+
+	// Set log level
+	if *logLevel != "info" {
+		cfg.LogLevel = *logLevel
+		log.SetLogLevel(cfg.LogLevel)
 	}
 
 	// Override config with command line flags
@@ -85,10 +88,6 @@ func main() {
 	}
 	if *proxyPrefix != "" {
 		cfg.Proxy.ProxyPrefix = *proxyPrefix
-	}
-	if *logLevel != "info" {
-		cfg.LogLevel = *logLevel
-		log.SetLogLevel(cfg.LogLevel)
 	}
 	if *upstreamURL != "" && len(cfg.Upstreams) > 0 {
 		parsedURL, err := url.Parse(*upstreamURL)
@@ -131,7 +130,7 @@ func main() {
 		logger.Info().Str("prefix", prefix).Msg("Using proxy prefix")
 
 		// Add prefixed routes
-		r.PathPrefix(prefix).Handler(http.StripPrefix(prefix, proxyHandler))
+		r.PathPrefix(prefix).Handler(proxyHandler)
 	} else {
 		// Routes without prefix
 		r.PathPrefix("/").Handler(proxyHandler)

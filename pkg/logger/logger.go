@@ -15,7 +15,7 @@ func init() {
 	// Customize output format (here we're using ConsoleWriter for human readability)
 	logger = zerolog.New(
 		zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339},
-	).Level(zerolog.InfoLevel).With().Timestamp().Caller().Logger()
+	).With().Timestamp().Caller().Logger()
 
 	// Default to Info level
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)

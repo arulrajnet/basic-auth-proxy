@@ -263,12 +263,14 @@ func (p *Proxy) serveLoginPage(w http.ResponseWriter, r *http.Request) {
 
 	// Data for the template
 	data := struct {
+		ProxyPrefix string
 		Logo       string
 		Year       int
 		Version    string
 		FooterText string
 		Error      string
 	}{
+		ProxyPrefix: p.proxyPrefix,
 		Logo:       p.config.CustomPage.Logo,
 		Year:       time.Now().Year(),
 		Version:    version.VERSION,
