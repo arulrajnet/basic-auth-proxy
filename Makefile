@@ -27,7 +27,7 @@ DIST_DIR=dist
 BUILD_TAGS=
 
 # Flags for the go linker
-LDFLAGS=-ldflags "-X github.com/arulrajnet/basic-auth-proxy/pkg/version.VERSION=$(VERSION)"
+LDFLAGS=-ldflags "-X github.com/arulrajnet/basic-auth-proxy/pkg/version.VERSION=$(VERSION) -extldflags '-static'"
 
 .PHONY: all build clean test lint fmt vet tidy help run docker
 

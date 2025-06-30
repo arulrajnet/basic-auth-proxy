@@ -38,7 +38,7 @@ RUN case ${TARGETPLATFORM} in \
         "windows/386") GOOS=windows GOARCH=386  ;; \
     esac && \
     printf "Building basic-auth-proxy for OS: ${GOOS}, Arch: ${GOARCH}\n" && \
-    GOOS=${GOOS} GOARCH=${GOARCH} VERSION=${VERSION} make build
+    CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} VERSION=${VERSION} make build
 
 # Final image
 FROM scratch AS final
