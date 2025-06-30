@@ -16,7 +16,7 @@ services:
       - --address=0.0.0.0
       - --port=80
       - --proxy-prefix=/auth/
-      - --upstream=http://192.168.1.232:32836/
+      - --upstream=http://nagios_legacy:80/
       - --log-level=debug
 
   nagios_legacy:
