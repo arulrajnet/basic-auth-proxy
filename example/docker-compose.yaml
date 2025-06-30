@@ -6,8 +6,9 @@ services:
       context: ..
       dockerfile: Dockerfile
       args:
-        GIT_COMMIT: ${GIT_COMMIT:-$(git describe --tags --always --dirty)}
-        VERSION: ${VERSION:-dev}
+        GIT_COMMIT: ${GIT_COMMIT}
+        VERSION: ${VERSION}
+        TARGETPLATFORM: ${TARGETPLATFORM}
     image: arulrajnet/basic-auth-proxy:dev
     ports:
       - "80:80"
