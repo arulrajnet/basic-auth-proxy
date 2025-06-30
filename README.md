@@ -2,7 +2,7 @@
 
 **BasicAuth-Proxy** is a brandable, lightweight reverse proxy designed to modernize and secure legacy applications that rely on HTTP Basic Authentication. By introducing an authentication layer that issues session-based credentials, the proxy mitigates many of the inherent risks and usability challenges associated with exposing Basic Auth directly to end users.
 
-### Key Features:
+## Key Features:
 
 * Brandable Login Screen – Customize the UI to match your brand.
 * Session Management – Convert Basic Auth into session-based authentication.
@@ -12,7 +12,7 @@
 
 Ideal for teams looking to modernize authentication without modifying upstream applications.
 
-### Architecture
+## Architecture
 
 ![basic-auth-proxy.drawio.png](basic-auth-proxy.drawio.png)
 
@@ -53,4 +53,35 @@ sequenceDiagram
     Proxy->>Login: Redirect to Login Screen
 ```
 
-### Usage
+## Usage
+
+
+## Roadmap
+
+- [ ] Support for SSL/TLS encryption
+- [ ] Support for Let's Encrypt automatic certificate management
+- [ ] Support for multiple upstream services
+- [ ] Support for configurable cookie flags (secure, httpOnly, sameSite)
+- [ ] Run behind another reverse proxy (X-Forwarded-For support)
+
+
+
+## Author
+
+<p align="center">
+  <a href="https://x.com/arulrajnet">
+    <img src="https://github.com/arulrajnet.png?size=100" alt="Arulraj V" width="100" height="100" style="border-radius: 50%;" class="avatar-user">
+  </a>
+  <br>
+  <strong>Arul</strong>
+  <br>
+  <a href="https://x.com/arulrajnet">
+    <img src="https://img.shields.io/badge/Follow-%40arulrajnet-1DA1F2?style=for-the-badge&logo=x&logoColor=white" alt="Follow @arulrajnet on X">
+  </a>
+  <a href="https://github.com/arulrajnet">
+    <img src="https://img.shields.io/badge/GitHub-arulrajnet-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub @arulrajnet">
+  </a>
+  <a href="https://linkedin.com/in/arulrajnet">
+    <img src="https://custom-icon-badges.demolab.com/badge/LinkedIn-arulrajnet-0A66C2?style=for-the-badge&logo=linkedin-white&logoColor=white" alt="LinkedIn @arulrajnet">
+  </a>
+</p>
