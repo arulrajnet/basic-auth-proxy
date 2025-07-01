@@ -1,0 +1,167 @@
+name: Release Docker Build and Push
+
+on:
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build and push'
+        required: true
+        type: string
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: arulrajnet/basic-auth-proxy
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Get tag name
+        id: get_tag
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ steps.get_tag.outputs.tag }}
+            type=raw,value=latest
+
+      - name: Get version and build info
+        id: build_info
+        run: |
+          VERSION="${{ steps.get_tag.outputs.tag }}"
+          GIT_COMMIT=$(git rev-parse HEAD)
+          BUILD_IMAGE_ID="${{ github.run_id }}-${{ github.run_number }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "git_commit=$GIT_COMMIT" >> $GITHUB_OUTPUT
+          echo "build_image_id=$BUILD_IMAGE_ID" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/arm/v5,linux/386,linux/ppc64le,linux/s390x,linux/riscv64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.build_info.outputs.version }}
+            GIT_COMMIT=${{ steps.build_info.outputs.git_commit }}
+            BUILD_IMAGE_ID=${{ steps.build_info.outputs.build_image_id }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Generate Docker Hub description
+        id: docker_desc
+        run: |
+          cat > docker_description.md << 'EOF'
+          # BasicAuth Proxy
+
+          A brandable, lightweight reverse proxy designed to modernize and secure legacy applications that rely on HTTP Basic Authentication.
+
+          ## Quick Start
+
+          ```bash
+          docker run -d \
+            --name basic-auth-proxy \
+            -p 8080:8080 \
+            -v $(pwd)/config.yaml:/app/config.yaml \
+            arulrajnet/basic-auth-proxy:latest
+          ```
+
+          ## Features
+
+          * Brandable Login Screen – Customize the UI to match your brand
+          * Session Management – Convert Basic Auth into session-based authentication
+          * Secure Reverse Proxy – Acts as a gateway to upstream services with Basic Auth
+          * Improved User Experience – Eliminates the need for users to enter credentials repeatedly
+          * Seamless Integration – Drop-in replacement for services requiring Basic Auth
+
+          ## Documentation
+
+          For detailed documentation, visit: https://github.com/arulrajnet/basic-auth-proxy
+
+          ## Supported Architectures
+
+          * linux/amd64
+          * linux/arm64
+          * linux/arm/v7
+          * linux/arm/v6
+          * linux/arm/v5
+          * linux/386
+          * linux/ppc64le
+          * linux/s390x
+          * linux/riscv64
+
+          ## Tags
+
+          * `latest` - Latest stable release
+          * `<version>` - Specific version (e.g., `v1.0.0`)
+          EOF
+
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          repository: ${{ env.IMAGE_NAME }}
+          short-description: "A brandable, lightweight reverse proxy for legacy apps with Basic Auth"
+          readme-filepath: docker_description.md
+
+      - name: Create release summary
+        run: |
+          echo "## 🐳 Docker Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** \`${{ steps.get_tag.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get_tag.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Latest:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Supported Platforms:**" >> $GITHUB_STEP_SUMMARY
+          echo "- linux/amd64" >> $GITHUB_STEP_SUMMARY
+          echo "- linux/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "- linux/arm/v7" >> $GITHUB_STEP_SUMMARY
+          echo "- linux/arm/v6" >> $GITHUB_STEP_SUMMARY
+          echo "- linux/arm/v5" >> $GITHUB_STEP_SUMMARY
+          echo "- linux/386" >> $GITHUB_STEP_SUMMARY
+          echo "- linux/ppc64le" >> $GITHUB_STEP_SUMMARY
+          echo "- linux/s390x" >> $GITHUB_STEP_SUMMARY
+          echo "- linux/riscv64" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Pull commands:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Specific version" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get_tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Latest" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

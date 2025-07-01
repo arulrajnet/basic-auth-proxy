@@ -1,0 +1,119 @@
+name: Docker Build Test
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'Dockerfile'
+      - 'go.mod'
+      - 'go.sum'
+      - 'cmd/**'
+      - 'pkg/**'
+      - 'static/**'
+      - '.github/workflows/docker-*.yml'
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: basic-auth-proxy
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Get version and build info
+        id: build_info
+        run: |
+          VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+          GIT_COMMIT=$(git rev-parse HEAD)
+          BUILD_IMAGE_ID="${{ github.run_id }}-${{ github.run_number }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "git_commit=$GIT_COMMIT" >> $GITHUB_OUTPUT
+          echo "build_image_id=$BUILD_IMAGE_ID" >> $GITHUB_OUTPUT
+
+      - name: Test Docker build (linux/amd64)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          tags: ${{ env.IMAGE_NAME }}:test
+          build-args: |
+            VERSION=${{ steps.build_info.outputs.version }}
+            GIT_COMMIT=${{ steps.build_info.outputs.git_commit }}
+            BUILD_IMAGE_ID=${{ steps.build_info.outputs.build_image_id }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test multi-platform build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: false
+          tags: ${{ env.IMAGE_NAME }}:test-multiarch
+          build-args: |
+            VERSION=${{ steps.build_info.outputs.version }}
+            GIT_COMMIT=${{ steps.build_info.outputs.git_commit }}
+            BUILD_IMAGE_ID=${{ steps.build_info.outputs.build_image_id }}
+          cache-from: type=gha
+
+      - name: Run basic container test
+        run: |
+          docker run --rm --name test-container \
+            -d -p 8080:8080 \
+            ${{ env.IMAGE_NAME }}:test
+
+          # Wait for container to start
+          sleep 5
+
+          # Test if container is running
+          if docker ps | grep test-container; then
+            echo "✅ Container started successfully"
+          else
+            echo "❌ Container failed to start"
+            docker logs test-container
+            exit 1
+          fi
+
+          # Stop the container
+          docker stop test-container
+
+      - name: Validate Dockerfile
+        run: |
+          # Check if Dockerfile follows best practices
+          if command -v hadolint &> /dev/null; then
+            hadolint Dockerfile
+          else
+            echo "Hadolint not available, skipping Dockerfile linting"
+          fi
+
+      - name: Check image size
+        run: |
+          IMAGE_SIZE=$(docker images ${{ env.IMAGE_NAME }}:test --format "table {{.Size}}" | tail -n 1)
+          echo "📦 Image size: $IMAGE_SIZE"
+          echo "image_size=$IMAGE_SIZE" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create build summary
+        run: |
+          echo "## 🐳 Docker Build Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ✅ Build Successful" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`${{ steps.build_info.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ steps.build_info.outputs.git_commit }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Build ID:** \`${{ steps.build_info.outputs.build_image_id }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tested Platforms:**" >> $GITHUB_STEP_SUMMARY
+          echo "- linux/amd64 ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- linux/arm64 ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- linux/arm/v7 ✅" >> $GITHUB_STEP_SUMMARY

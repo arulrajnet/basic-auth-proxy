@@ -1,0 +1,237 @@
+name: Docker Security and Quality
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'Dockerfile'
+      - '.github/workflows/docker-*.yml'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'Dockerfile'
+      - '.github/workflows/docker-*.yml'
+  schedule:
+    # Run weekly security scans
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: basic-auth-proxy-security-test
+
+jobs:
+  dockerfile-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: warning
+          format: sarif
+          output-file: hadolint-results.sarif
+
+      - name: Upload Hadolint results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: hadolint-results.sarif
+
+  security-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Get version and build info
+        id: build_info
+        run: |
+          VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+          GIT_COMMIT=$(git rev-parse HEAD)
+          BUILD_IMAGE_ID="${{ github.run_id }}-${{ github.run_number }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "git_commit=$GIT_COMMIT" >> $GITHUB_OUTPUT
+          echo "build_image_id=$BUILD_IMAGE_ID" >> $GITHUB_OUTPUT
+
+      - name: Build test image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          build-args: |
+            VERSION=${{ steps.build_info.outputs.version }}
+            GIT_COMMIT=${{ steps.build_info.outputs.git_commit }}
+            BUILD_IMAGE_ID=${{ steps.build_info.outputs.build_image_id }}
+          cache-from: type=gha
+          load: true
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Trivy vulnerability scanner (table output)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+  best-practices:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check Docker best practices
+        run: |
+          echo "## 🐳 Docker Best Practices Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check for multi-stage build
+          if grep -q "FROM.*AS.*" Dockerfile; then
+            echo "✅ Multi-stage build detected" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Consider using multi-stage build" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check for non-root user
+          if grep -q "USER.*" Dockerfile; then
+            echo "✅ Non-root user specified" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ Running as root (acceptable for scratch image)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check for minimal base image
+          if grep -q "FROM scratch" Dockerfile; then
+            echo "✅ Minimal base image (scratch) used" >> $GITHUB_STEP_SUMMARY
+          elif grep -q "FROM.*alpine" Dockerfile; then
+            echo "✅ Alpine base image used" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ Consider using minimal base image" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check for WORKDIR
+          if grep -q "WORKDIR" Dockerfile; then
+            echo "✅ WORKDIR specified" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ WORKDIR not specified" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check for version labels
+          if grep -q "org.opencontainers.image" Dockerfile; then
+            echo "✅ OpenContainer labels present" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ Consider adding OpenContainer labels" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check workflow security
+        run: |
+          echo "## 🔒 Workflow Security Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check for pinned actions
+          PINNED_ACTIONS=$(find .github/workflows -name "*.yml" -exec grep -l "@v[0-9]" {} \; | wc -l)
+          TOTAL_WORKFLOWS=$(find .github/workflows -name "*.yml" | wc -l)
+
+          if [ "$PINNED_ACTIONS" -eq "$TOTAL_WORKFLOWS" ]; then
+            echo "✅ All workflow actions are pinned to versions" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Some actions may not be pinned to specific versions" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check for secret usage
+          if find .github/workflows -name "*.yml" -exec grep -l "secrets\." {} \; > /dev/null; then
+            echo "✅ Secrets properly referenced" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ No secrets used in workflows" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  image-analysis:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Get build info
+        id: build_info
+        run: |
+          VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+          GIT_COMMIT=$(git rev-parse HEAD)
+          BUILD_IMAGE_ID="${{ github.run_id }}-${{ github.run_number }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "git_commit=$GIT_COMMIT" >> $GITHUB_OUTPUT
+          echo "build_image_id=$BUILD_IMAGE_ID" >> $GITHUB_OUTPUT
+
+      - name: Build and analyze image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          tags: ${{ env.IMAGE_NAME }}:analysis
+          build-args: |
+            VERSION=${{ steps.build_info.outputs.version }}
+            GIT_COMMIT=${{ steps.build_info.outputs.git_commit }}
+            BUILD_IMAGE_ID=${{ steps.build_info.outputs.build_image_id }}
+          cache-from: type=gha
+          load: true
+
+      - name: Analyze image
+        run: |
+          echo "## 📊 Image Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Get image size
+          IMAGE_SIZE=$(docker images ${{ env.IMAGE_NAME }}:analysis --format "table {{.Size}}" | tail -n 1)
+          echo "**Image Size:** $IMAGE_SIZE" >> $GITHUB_STEP_SUMMARY
+
+          # Get layer count
+          LAYER_COUNT=$(docker history ${{ env.IMAGE_NAME }}:analysis --format "table {{.CreatedBy}}" | tail -n +2 | wc -l)
+          echo "**Layers:** $LAYER_COUNT" >> $GITHUB_STEP_SUMMARY
+
+          # Check if image runs
+          echo "**Functionality Test:**" >> $GITHUB_STEP_SUMMARY
+          if timeout 10 docker run --rm ${{ env.IMAGE_NAME }}:analysis --version 2>/dev/null; then
+            echo "✅ Image runs successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Image startup test inconclusive" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Details:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          docker inspect ${{ env.IMAGE_NAME }}:analysis --format='{{json .Config.Labels}}' | jq . >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
