@@ -59,6 +59,108 @@ sequenceDiagram
 
 ## Usage
 
+### Quick Start
+
+#### Option 1: Using Docker (Recommended)
+
+```bash
+# Pull the latest image
+docker pull arulrajnet/basic-auth-proxy:latest
+
+# Run with minimal configuration
+docker run -p 8080:8080 \
+  -e BAP_UPSTREAM_URL=http://your-backend-service:8081 \
+  -e BAP_PROXY_PREFIX=/auth \
+  -e BAP_PROXY_PORT=8080 \
+  arulrajnet/basic-auth-proxy:latest
+```
+
+#### Option 2: Using Docker Compose
+
+Create a `docker-compose.yaml` file:
+
+```yaml
+services:
+  proxy:
+    image: arulrajnet/basic-auth-proxy:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.yaml:/app/config.yaml
+    environment:
+      - BAP_LOG_LEVEL=info
+```
+
+#### Option 3: Binary Installation
+
+```bash
+# Download the latest release
+wget https://github.com/arulrajnet/basic-auth-proxy/releases/latest/download/basic-auth-proxy-linux-amd64
+
+# Make executable and move to PATH
+chmod +x basic-auth-proxy-linux-amd64
+sudo mv basic-auth-proxy-linux-amd64 /usr/local/bin/basic-auth-proxy
+
+# Run with configuration file
+basic-auth-proxy --config config.yaml
+```
+
+### Configuration
+
+#### Configuration File (config.yaml)
+
+Create a configuration file to customize the proxy behavior:
+
+```yaml
+proxy:
+  address: "0.0.0.0"
+  port: 8080
+  prefix: "/auth"
+  timeout: 30
+
+upstreams:
+  - url: "http://localhost:8081"
+    timeout: 30
+
+cookie:
+  name: "basic_auth_proxy_session"
+  secret_key: "your-secret-key-here"
+  domain: "localhost"
+  max_age: 86400  # 24 hours
+  secure: false
+  http_only: true
+  same_site: "lax"
+
+custom_page:
+  logo: "https://your-domain.com/logo.png"
+  template_dir: ""
+  footer_text: ""
+
+log_level: "info"
+```
+
+#### Command Line Options
+
+```bash
+basic-auth-proxy [options]
+
+Options:
+  -c, --config string          Path to configuration file
+  -a, --address string         Address to listen on (default: 0.0.0.0)
+  -p, --port int              Port to listen on (default: 8080)
+  -u, --upstream string       Upstream server URL
+  -l, --log-level string      Log level (trace, debug, info, warn, error, fatal, panic)
+  -P, --proxy-prefix string   Prefix path for the proxy
+  -s, --cookie-name string    Cookie name for session
+  -S, --cookie-secret string  Cookie secret key
+  -L, --logo string           Path or URL for login page logo
+  -T, --template-dir string   Path to custom login template
+  -f, --footer-text string    Footer text for login page
+  -v, --version               Print version information
+  -h, --help                  Show help message
+```
+
+
 
 ## Roadmap
 
