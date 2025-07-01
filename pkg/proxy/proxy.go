@@ -217,7 +217,7 @@ func (p *Proxy) handleSignIn(w http.ResponseWriter, r *http.Request) {
 
 		if username == "" || password == "" {
 			logger.Warn().Msg("Missing username or password")
-			p.serveLoginPage(w, r)
+			p.serveLoginPage(w, r, "Please enter both username and password")
 			return
 		}
 
@@ -231,11 +231,11 @@ func (p *Proxy) handleSignIn(w http.ResponseWriter, r *http.Request) {
 		upstream := p.config.Upstreams[0] // Using first upstream
 		if validated, err := p.validateCredentials(upstream, username, password); err != nil {
 			logger.Error().Err(err).Msg("Error validating credentials")
-			http.Error(w, "Authentication Error", http.StatusInternalServerError)
+			p.serveLoginPage(w, r, "Authentication service temporarily unavailable. Please try again later.")
 			return
 		} else if !validated {
 			logger.Warn().Str("username", username).Msg("Invalid credentials")
-			p.serveLoginPage(w, r)
+			p.serveLoginPage(w, r, "Invalid username or password")
 			return
 		}
 
@@ -307,7 +307,7 @@ func (p *Proxy) handleUserInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 // Serve the login page
-func (p *Proxy) serveLoginPage(w http.ResponseWriter, r *http.Request) {
+func (p *Proxy) serveLoginPage(w http.ResponseWriter, r *http.Request, errorMsg ...string) {
 	var tmpl *template.Template
 	var err error
 
@@ -325,7 +325,14 @@ func (p *Proxy) serveLoginPage(w http.ResponseWriter, r *http.Request) {
 		Year:       time.Now().Year(),
 		Version:    version.VERSION,
 		FooterText: p.config.CustomPage.FooterText,
-		Error:      r.URL.Query().Get("error"),
+		Error:      "",
+	}
+
+	// Set error message if provided as parameter or from query
+	if len(errorMsg) > 0 && errorMsg[0] != "" {
+		data.Error = errorMsg[0]
+	} else if queryError := r.URL.Query().Get("error"); queryError != "" {
+		data.Error = queryError
 	}
 
 	// If logo is empty, use placeholder
