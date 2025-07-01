@@ -115,6 +115,9 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else if path == p.proxyPrefix+"/user_info" {
 			p.handleUserInfo(w, r)
 			return
+		} else if strings.HasPrefix(path, p.proxyPrefix+"/static/") {
+			p.handleStaticFiles(w, r)
+			return
 		}
 	} else {
 		// No proxy prefix, check regular auth endpoints
@@ -126,6 +129,9 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		} else if path == "/user_info" {
 			p.handleUserInfo(w, r)
+			return
+		} else if strings.HasPrefix(path, "/static/") {
+			p.handleStaticFiles(w, r)
 			return
 		}
 	}
@@ -342,6 +348,42 @@ func (p *Proxy) serveLoginPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Template Error", http.StatusInternalServerError)
 		return
 	}
+}
+
+// Handle static file requests
+func (p *Proxy) handleStaticFiles(w http.ResponseWriter, r *http.Request) {
+	// Extract the file path from the request
+	var filePath string
+	if p.proxyPrefix != "" && p.proxyPrefix != "/" {
+		// Remove proxy prefix and "/static" from the path
+		filePath = strings.TrimPrefix(r.URL.Path, p.proxyPrefix+"/static")
+	} else {
+		// Remove "/static" from the path
+		filePath = strings.TrimPrefix(r.URL.Path, "/static")
+	}
+
+	// Remove leading slash if present
+	filePath = strings.TrimPrefix(filePath, "/")
+
+	// Prevent directory traversal attacks
+	if strings.Contains(filePath, "..") {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	// Create file server with the static directory
+	fileServer := http.FileServer(http.Dir("static"))
+
+	// Create a new request with the cleaned path
+	r.URL.Path = "/" + filePath
+
+	// Add security headers for static files
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("X-XSS-Protection", "1; mode=block")
+
+	// Serve the file
+	fileServer.ServeHTTP(w, r)
 }
 
 // Validate user credentials against upstream server

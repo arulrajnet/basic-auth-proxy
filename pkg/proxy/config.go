@@ -49,12 +49,13 @@ type CookieConfig struct {
 
 // DefaultConfig returns default configuration values
 func DefaultConfig() *Config {
+	proxyPrefix := "/auth" // Default proxy prefix
 	return &Config{
 		Proxy: ProxyConfig{
 			Address:     "0.0.0.0",
 			Port:        8080,
 			Timeout:     30,
-			ProxyPrefix: "/auth",
+			ProxyPrefix: proxyPrefix,
 		},
 		Upstreams: []Upstream{
 			{
@@ -62,7 +63,7 @@ func DefaultConfig() *Config {
 			},
 		},
 		CustomPage: CustomPage{
-			Logo:        "https://via.placeholder.com/120x60?text=Logo",
+			Logo:        proxyPrefix + "/static/img/logo.svg",
 			TemplateDir: "",
 			FooterText:  "",
 		},

@@ -47,6 +47,8 @@ LABEL maintainer="Arulraj V <me@arulraj.net>"
 ARG VERSION=unspecified
 ENV VERSION=${VERSION}
 
+WORKDIR /app
+COPY static /app/static
 COPY --from=base /app/build/basic-auth-proxy /usr/bin/basic-auth-proxy
 
 LABEL org.opencontainers.image.licenses=MIT \
