@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	log "github.com/arulrajnet/basic-auth-proxy/pkg/logger"
@@ -116,25 +117,23 @@ func main() {
 	// Create session manager
 	sessionManager := session.NewSessionManager(cfg.Cookie.SecretKey)
 
-	// Create proxy handler
+	// Create proxy handler for auth routes (this is the same proxy instance used by middleware)
 	proxyHandler := proxy.NewProxy(cfg, sessionManager)
 
 	// Setup router
 	r := mux.NewRouter()
 	r.Use(proxy.RequestLogger(logger))
 
-	// Add routes
-	if cfg.Proxy.ProxyPrefix != "" && cfg.Proxy.ProxyPrefix != "/" {
-		// Routes with prefix
-		prefix := cfg.Proxy.ProxyPrefix
-		logger.Info().Str("prefix", prefix).Msg("Using proxy prefix")
-
-		// Add prefixed routes
-		r.PathPrefix(prefix).Handler(proxyHandler)
-	} else {
-		// Routes without prefix
-		r.PathPrefix("/").Handler(proxyHandler)
+	// Add auth routes
+	authPrefix := cfg.Proxy.ProxyPrefix
+	if authPrefix == "" {
+		authPrefix = "/auth"
 	}
+	authPrefix = strings.TrimSuffix(authPrefix, "/")
+
+	// Auth routes (these bypass session middleware check)
+	// r.PathPrefix(authPrefix + "/").Handler(proxyHandler)
+	r.PathPrefix("/").Handler(proxyHandler)
 
 	// Create server
 	addr := fmt.Sprintf("%s:%d", cfg.Proxy.Address, cfg.Proxy.Port)

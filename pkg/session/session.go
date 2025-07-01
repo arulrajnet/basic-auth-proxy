@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	log "github.com/arulrajnet/basic-auth-proxy/pkg/logger"
@@ -174,6 +173,8 @@ func (m *SessionManager) GetUserInfoJSON(r *http.Request, sessionName string) ([
 	if err != nil {
 		return nil, err
 	}
+
+	userInfo.Password = "" // Do not expose password in JSON response
 
 	return json.Marshal(userInfo)
 }

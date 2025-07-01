@@ -130,21 +130,37 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Build login path with redirect parameter
+	loginPath := "/login"
+	if p.proxyPrefix != "" && p.proxyPrefix != "/" {
+		loginPath = p.proxyPrefix + "/login"
+	}
+
+	// Add current path as redirect parameter
+	redirectPath := r.URL.RequestURI()
+	if redirectPath != loginPath && !strings.Contains(redirectPath, "/login") {
+		q := url.Values{}
+		q.Add("redirect", redirectPath)
+		loginPath = fmt.Sprintf("%s?%s", loginPath, q.Encode())
+	}
+
 	// For all other requests, check authentication and proxy to upstream
 	session, err := p.sessionManager.Get(r, p.config.Cookie.Name)
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to get session")
-		http.Error(w, "Session Error", http.StatusInternalServerError)
+		http.Redirect(w, r, loginPath, http.StatusFound)
+		return
+	}
+
+	// Check if session exists
+	if session == nil {
+		http.Redirect(w, r, loginPath, http.StatusFound)
 		return
 	}
 
 	// Check if user is authenticated
 	if auth, ok := session.Values["authenticated"].(bool); !ok || !auth {
-		// Redirect to login page
-		loginPath := "/login"
-		if p.proxyPrefix != "" && p.proxyPrefix != "/" {
-			loginPath = p.proxyPrefix + "/login"
-		}
+		logger.Info().Str("path", r.URL.Path).Msg("Unauthenticated request")
 		http.Redirect(w, r, loginPath, http.StatusFound)
 		return
 	}
@@ -224,19 +240,31 @@ func (p *Proxy) handleSignIn(w http.ResponseWriter, r *http.Request) {
 
 // Handle sign-out requests
 func (p *Proxy) handleSignOut(w http.ResponseWriter, r *http.Request) {
-	// Destroy the session
-	err := p.sessionManager.Destroy(w, r, p.config.Cookie.Name)
-	if err != nil {
-		logger.Error().Err(err).Msg("Failed to destroy session")
-		http.Error(w, "Session Error", http.StatusInternalServerError)
-		return
-	}
-
 	// Redirect to login page
 	loginPath := "/login"
 	if p.proxyPrefix != "" && p.proxyPrefix != "/" {
 		loginPath = p.proxyPrefix + "/login"
 	}
+	// Destroy the session
+	err := p.sessionManager.Destroy(w, r, p.config.Cookie.Name)
+	if err != nil {
+		logger.Error().Err(err).Msg("Failed to destroy session")
+		// Try to clear the cookie even if session destruction failed
+		cookie := &http.Cookie{
+			Name:     p.config.Cookie.Name,
+			Value:    "",
+			Path:     p.config.Cookie.Path,
+			Domain:   p.config.Cookie.Domain,
+			MaxAge:   -1,
+			Expires:  time.Now().Add(-1 * time.Hour),
+			Secure:   p.config.Cookie.Secure,
+			HttpOnly: p.config.Cookie.HttpOnly,
+		}
+		http.SetCookie(w, cookie)
+		http.Redirect(w, r, loginPath, http.StatusFound)
+		return
+	}
+
 	http.Redirect(w, r, loginPath, http.StatusFound)
 }
 
