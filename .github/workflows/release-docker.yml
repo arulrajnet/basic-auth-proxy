@@ -1,4 +1,4 @@
-name: Release Docker Build and Push
+name: Release Build and Publish
 
 on:
   release:
@@ -15,10 +15,113 @@ env:
   IMAGE_NAME: arulrajnet/basic-auth-proxy
 
 jobs:
-  build-and-push:
+  build-binaries:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
+
+    strategy:
+      matrix:
+        include:
+          # Linux architectures
+          - goos: linux
+            goarch: amd64
+            suffix: linux-amd64
+          - goos: linux
+            goarch: arm64
+            suffix: linux-arm64
+          - goos: linux
+            goarch: arm
+            goarm: 7
+            suffix: linux-armv7
+          - goos: linux
+            goarch: arm
+            goarm: 6
+            suffix: linux-armv6
+          - goos: linux
+            goarch: arm
+            goarm: 5
+            suffix: linux-armv5
+          - goos: linux
+            goarch: 386
+            suffix: linux-386
+          - goos: linux
+            goarch: ppc64le
+            suffix: linux-ppc64le
+          - goos: linux
+            goarch: s390x
+            suffix: linux-s390x
+          - goos: linux
+            goarch: riscv64
+            suffix: linux-riscv64
+          # macOS architectures
+          - goos: darwin
+            goarch: amd64
+            suffix: darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            suffix: darwin-arm64
+          # Windows architectures
+          - goos: windows
+            goarch: amd64
+            suffix: windows-amd64.exe
+          - goos: windows
+            goarch: 386
+            suffix: windows-386.exe
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Get tag name
+        id: get_tag
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build binary
+        run: |
+          VERSION="${{ steps.get_tag.outputs.tag }}"
+          LDFLAGS="-ldflags \"-X github.com/arulrajnet/basic-auth-proxy/pkg/version.VERSION=${VERSION} -extldflags '-static'\""
+
+          mkdir -p dist
+
+          export GOOS=${{ matrix.goos }}
+          export GOARCH=${{ matrix.goarch }}
+          ${{ matrix.goarm && format('export GOARM={0}', matrix.goarm) || '' }}
+
+          eval "go build ${LDFLAGS} -o dist/basic-auth-proxy-${{ matrix.suffix }} ./cmd"
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum basic-auth-proxy-${{ matrix.suffix }} > basic-auth-proxy-${{ matrix.suffix }}.sha256
+
+      - name: Upload release assets
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_tag.outputs.tag }}
+          files: |
+            ./dist/basic-auth-proxy-${{ matrix.suffix }}
+            ./dist/basic-auth-proxy-${{ matrix.suffix }}.sha256
+
+  docker-build-and-push:
+    runs-on: ubuntu-latest
+    needs: build-binaries
+    permissions:
+      contents: write
       packages: write
 
     steps:
@@ -81,6 +184,141 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Get previous release tag
+        id: previous_tag
+        run: |
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -v "${{ steps.get_tag.outputs.tag }}" | head -n 1)
+          echo "previous_tag=${PREVIOUS_TAG}" >> $GITHUB_OUTPUT
+          echo "Previous release tag: ${PREVIOUS_TAG}"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          CURRENT_TAG="${{ steps.get_tag.outputs.tag }}"
+          PREVIOUS_TAG="${{ steps.previous_tag.outputs.previous_tag }}"
+
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "No previous release found, generating changelog from initial commit"
+            CHANGELOG=$(git log --pretty=format:"* %s ([%h](https://github.com/${{ github.repository }}/commit/%H)) - %an" --reverse)
+          else
+            echo "Generating changelog from $PREVIOUS_TAG to $CURRENT_TAG"
+            CHANGELOG=$(git log ${PREVIOUS_TAG}..${CURRENT_TAG} --pretty=format:"* %s ([%h](https://github.com/${{ github.repository }}/commit/%H)) - %an" --reverse)
+          fi
+
+          # Save changelog to file
+          cat > changelog.md << 'EOF'
+          ## 📝 What's Changed
+
+          EOF
+
+          if [ -z "$CHANGELOG" ]; then
+            echo "* No changes since previous release" >> changelog.md
+          else
+            echo "$CHANGELOG" >> changelog.md
+          fi
+
+          echo "" >> changelog.md
+
+          # Set output (truncated for GitHub Actions)
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          head -n 20 changelog.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Generate contributors
+        id: contributors
+        run: |
+          CURRENT_TAG="${{ steps.get_tag.outputs.tag }}"
+          PREVIOUS_TAG="${{ steps.previous_tag.outputs.previous_tag }}"
+
+          if [ -z "$PREVIOUS_TAG" ]; then
+            CONTRIBUTORS=$(git log --pretty=format:"%an <%ae>" | sort -u)
+          else
+            CONTRIBUTORS=$(git log ${PREVIOUS_TAG}..${CURRENT_TAG} --pretty=format:"%an <%ae>" | sort -u)
+          fi
+
+          echo "## 👥 Contributors" >> changelog.md
+          echo "" >> changelog.md
+
+          if [ -z "$CONTRIBUTORS" ]; then
+            echo "* No new contributors" >> changelog.md
+          else
+            while IFS= read -r contributor; do
+              name=$(echo "$contributor" | sed 's/ <.*//')
+              email=$(echo "$contributor" | sed 's/.*<//' | sed 's/>//')
+              # Try to get GitHub username from git config or commit
+              github_user=$(git log --author="$email" --pretty=format:"%an" | head -n 1 | tr '[:upper:]' '[:lower:]' | sed 's/ //g')
+              echo "* **$name** - [@$github_user](https://github.com/$github_user)" >> changelog.md
+            done <<< "$CONTRIBUTORS"
+          fi
+
+          echo "" >> changelog.md
+
+      - name: Generate binary download section
+        run: |
+          echo "## 📦 Downloads" >> changelog.md
+          echo "" >> changelog.md
+          echo "### Binaries" >> changelog.md
+          echo "" >> changelog.md
+          echo "| Platform | Architecture | Download |" >> changelog.md
+          echo "|----------|--------------|----------|" >> changelog.md
+          echo "| Linux | amd64 | [basic-auth-proxy-linux-amd64](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_tag.outputs.tag }}/basic-auth-proxy-linux-amd64) |" >> changelog.md
+          echo "| Linux | arm64 | [basic-auth-proxy-linux-arm64](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_tag.outputs.tag }}/basic-auth-proxy-linux-arm64) |" >> changelog.md
+          echo "| Linux | armv7 | [basic-auth-proxy-linux-armv7](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_tag.outputs.tag }}/basic-auth-proxy-linux-armv7) |" >> changelog.md
+          echo "| Linux | armv6 | [basic-auth-proxy-linux-armv6](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_tag.outputs.tag }}/basic-auth-proxy-linux-armv6) |" >> changelog.md
+          echo "| Linux | armv5 | [basic-auth-proxy-linux-armv5](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_tag.outputs.tag }}/basic-auth-proxy-linux-armv5) |" >> changelog.md
+          echo "| Linux | 386 | [basic-auth-proxy-linux-386](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_tag.outputs.tag }}/basic-auth-proxy-linux-386) |" >> changelog.md
+          echo "| Linux | ppc64le | [basic-auth-proxy-linux-ppc64le](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_tag.outputs.tag }}/basic-auth-proxy-linux-ppc64le) |" >> changelog.md
+          echo "| Linux | s390x | [basic-auth-proxy-linux-s390x](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_tag.outputs.tag }}/basic-auth-proxy-linux-s390x) |" >> changelog.md
+          echo "| Linux | riscv64 | [basic-auth-proxy-linux-riscv64](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_tag.outputs.tag }}/basic-auth-proxy-linux-riscv64) |" >> changelog.md
+          echo "| macOS | amd64 | [basic-auth-proxy-darwin-amd64](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_tag.outputs.tag }}/basic-auth-proxy-darwin-amd64) |" >> changelog.md
+          echo "| macOS | arm64 | [basic-auth-proxy-darwin-arm64](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_tag.outputs.tag }}/basic-auth-proxy-darwin-arm64) |" >> changelog.md
+          echo "| Windows | amd64 | [basic-auth-proxy-windows-amd64.exe](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_tag.outputs.tag }}/basic-auth-proxy-windows-amd64.exe) |" >> changelog.md
+          echo "| Windows | 386 | [basic-auth-proxy-windows-386.exe](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_tag.outputs.tag }}/basic-auth-proxy-windows-386.exe) |" >> changelog.md
+          echo "" >> changelog.md
+          echo "### Docker Images" >> changelog.md
+          echo "" >> changelog.md
+          echo "\`\`\`bash" >> changelog.md
+          echo "# Pull specific version" >> changelog.md
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get_tag.outputs.tag }}" >> changelog.md
+          echo "" >> changelog.md
+          echo "# Pull latest" >> changelog.md
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> changelog.md
+          echo "\`\`\`" >> changelog.md
+          echo "" >> changelog.md
+          echo "### Verification" >> changelog.md
+          echo "" >> changelog.md
+          echo "All binaries include SHA256 checksums for verification:" >> changelog.md
+          echo "" >> changelog.md
+          echo "\`\`\`bash" >> changelog.md
+          echo "# Download binary and checksum" >> changelog.md
+          echo "wget https://github.com/${{ github.repository }}/releases/download/${{ steps.get_tag.outputs.tag }}/basic-auth-proxy-linux-amd64" >> changelog.md
+          echo "wget https://github.com/${{ github.repository }}/releases/download/${{ steps.get_tag.outputs.tag }}/basic-auth-proxy-linux-amd64.sha256" >> changelog.md
+          echo "" >> changelog.md
+          echo "# Verify checksum" >> changelog.md
+          echo "sha256sum -c basic-auth-proxy-linux-amd64.sha256" >> changelog.md
+          echo "\`\`\`" >> changelog.md
+
+      - name: Update release description
+        if: github.event_name == 'release'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const changelog = fs.readFileSync('changelog.md', 'utf8');
+
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: '${{ steps.get_tag.outputs.tag }}'
+            });
+
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.id,
+              body: changelog
+            });
+
       - name: Generate Docker Hub description
         id: docker_desc
         run: |
@@ -140,28 +378,36 @@ jobs:
 
       - name: Create release summary
         run: |
-          echo "## 🐳 Docker Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## � Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Tag:** \`${{ steps.get_tag.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get_tag.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Latest:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`${{ steps.get_tag.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Previous Version:** \`${{ steps.previous_tag.outputs.previous_tag || 'Initial Release' }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Supported Platforms:**" >> $GITHUB_STEP_SUMMARY
-          echo "- linux/amd64" >> $GITHUB_STEP_SUMMARY
-          echo "- linux/arm64" >> $GITHUB_STEP_SUMMARY
-          echo "- linux/arm/v7" >> $GITHUB_STEP_SUMMARY
-          echo "- linux/arm/v6" >> $GITHUB_STEP_SUMMARY
-          echo "- linux/arm/v5" >> $GITHUB_STEP_SUMMARY
-          echo "- linux/386" >> $GITHUB_STEP_SUMMARY
-          echo "- linux/ppc64le" >> $GITHUB_STEP_SUMMARY
-          echo "- linux/s390x" >> $GITHUB_STEP_SUMMARY
-          echo "- linux/riscv64" >> $GITHUB_STEP_SUMMARY
+          echo "### 🐳 Docker Images" >> $GITHUB_STEP_SUMMARY
+          echo "- **Versioned:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get_tag.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Latest:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Pull commands:**" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Binary Releases" >> $GITHUB_STEP_SUMMARY
+          echo "**Linux:**" >> $GITHUB_STEP_SUMMARY
+          echo "- amd64, arm64, armv7, armv6, armv5, 386, ppc64le, s390x, riscv64" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**macOS:**" >> $GITHUB_STEP_SUMMARY
+          echo "- amd64 (Intel), arm64 (Apple Silicon)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Windows:**" >> $GITHUB_STEP_SUMMARY
+          echo "- amd64, 386" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔧 Docker Platforms" >> $GITHUB_STEP_SUMMARY
+          echo "- linux/amd64, linux/arm64, linux/arm/v7, linux/arm/v6, linux/arm/v5" >> $GITHUB_STEP_SUMMARY
+          echo "- linux/386, linux/ppc64le, linux/s390x, linux/riscv64" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Quick Commands" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "# Specific version" >> $GITHUB_STEP_SUMMARY
+          echo "# Docker" >> $GITHUB_STEP_SUMMARY
           echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get_tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "# Latest" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
+          echo "# Binary (Linux amd64)" >> $GITHUB_STEP_SUMMARY
+          echo "wget https://github.com/${{ github.repository }}/releases/download/${{ steps.get_tag.outputs.tag }}/basic-auth-proxy-linux-amd64" >> $GITHUB_STEP_SUMMARY
+          echo "chmod +x basic-auth-proxy-linux-amd64" >> $GITHUB_STEP_SUMMARY
+          echo "./basic-auth-proxy-linux-amd64 --version" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
