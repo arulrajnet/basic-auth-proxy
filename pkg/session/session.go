@@ -5,11 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
+	log "github.com/arulrajnet/basic-auth-proxy/pkg/logger"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
 )
+
+var logger = log.GetLogger()
 
 type SessionManager struct {
 	store        *sessions.CookieStore
@@ -53,7 +57,11 @@ func NewSessionManager(secretKey string) *SessionManager {
 func (m *SessionManager) ConfigureCookie(name, path, domain string, maxAge int, secure, httpOnly bool, sameSite string) {
 	m.cookieName = name
 	m.cookiePath = path
-	m.cookieDomain = domain
+	if domain != "localhost" || domain != "127.0.0.1" {
+		m.cookieDomain = domain
+	} else {
+		m.cookieDomain = ""
+	}
 	m.maxAge = maxAge
 	m.secure = secure
 	m.httpOnly = httpOnly
@@ -72,11 +80,11 @@ func (m *SessionManager) ConfigureCookie(name, path, domain string, maxAge int, 
 
 	// Configure the cookie store
 	m.store.Options = &sessions.Options{
-		Path:     path,
-		Domain:   domain,
-		MaxAge:   maxAge,
-		Secure:   secure,
-		HttpOnly: httpOnly,
+		Path:     m.cookiePath,
+		Domain:   m.cookieDomain,
+		MaxAge:   m.maxAge,
+		Secure:   m.secure,
+		HttpOnly: m.httpOnly,
 		SameSite: m.sameSite,
 	}
 }

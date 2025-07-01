@@ -69,7 +69,7 @@ func DefaultConfig() *Config {
 		LogLevel: "info",
 		Cookie: CookieConfig{
 			Name:     "basic_auth_proxy_session",
-			Domain:   "localhost",
+			Domain:   "",
 			Path:     "/",
 			Secure:   false,
 			HttpOnly: true,
