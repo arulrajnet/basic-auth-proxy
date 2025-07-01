@@ -54,18 +54,14 @@ jobs:
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             # Custom platforms for manual dispatch
             PLATFORMS="${{ inputs.platforms }}"
-            MATRIX='['
-            FIRST=true
+            MATRIX_ITEMS=()
             IFS=',' read -ra ADDR <<< "$PLATFORMS"
             for platform in "${ADDR[@]}"; do
+              # Trim whitespace
+              platform=$(echo "$platform" | xargs)
               IFS='/' read -ra PARTS <<< "$platform"
               GOOS="${PARTS[0]}"
               GOARCH="${PARTS[1]}"
-
-              if [ "$FIRST" = false ]; then
-                MATRIX="$MATRIX,"
-              fi
-              FIRST=false
 
               if [ "$GOOS" = "windows" ]; then
                 SUFFIX="$GOOS-$GOARCH.exe"
@@ -73,9 +69,12 @@ jobs:
                 SUFFIX="$GOOS-$GOARCH"
               fi
 
-              MATRIX="$MATRIX{\"goos\": \"$GOOS\", \"goarch\": \"$GOARCH\", \"suffix\": \"$SUFFIX\"}"
+              MATRIX_ITEMS+=("{\"goos\": \"$GOOS\", \"goarch\": \"$GOARCH\", \"suffix\": \"$SUFFIX\"}")
             done
-            MATRIX="$MATRIX]"
+
+            # Join array elements with commas
+            MATRIX_CONTENT=$(IFS=','; echo "${MATRIX_ITEMS[*]}")
+            MATRIX="[$MATRIX_CONTENT]"
           else
             # Limited platforms for automatic builds
             MATRIX='[
