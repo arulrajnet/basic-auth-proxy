@@ -7,7 +7,7 @@ on:
       - 'Dockerfile'
       - 'go.mod'
       - 'go.sum'
-      - 'cmd/**'
+      - 'main.go'
       - 'pkg/**'
       - 'static/**'
       - '.github/workflows/docker-*.yml'

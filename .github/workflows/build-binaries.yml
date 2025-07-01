@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main, master ]
     paths:
-      - 'cmd/**'
+      - 'main.go'
       - 'pkg/**'
       - 'go.mod'
       - 'go.sum'
@@ -12,7 +12,7 @@ on:
   pull_request:
     branches: [ main, master ]
     paths:
-      - 'cmd/**'
+      - 'main.go'
       - 'pkg/**'
       - 'go.mod'
       - 'go.sum'
@@ -125,7 +125,7 @@ jobs:
           ${{ matrix.goarm && format('export GOARM={0}', matrix.goarm) || '' }}
 
           echo "Building for $GOOS/$GOARCH..."
-          eval "go build ${LDFLAGS} -o dist/basic-auth-proxy-${{ matrix.suffix }} ./cmd"
+          eval "go build ${LDFLAGS} -o dist/basic-auth-proxy-${{ matrix.suffix }} ."
 
           # Verify the binary was created
           if [ -f "dist/basic-auth-proxy-${{ matrix.suffix }}" ]; then

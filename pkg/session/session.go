@@ -174,7 +174,14 @@ func (m *SessionManager) GetUserInfoJSON(r *http.Request, sessionName string) ([
 		return nil, err
 	}
 
-	userInfo.Password = "" // Do not expose password in JSON response
+	// Create a response object without the password field
+	userResponse := struct {
+		Username string    `json:"username"`
+		LoggedIn time.Time `json:"logged_in"`
+	}{
+		Username: userInfo.Username,
+		LoggedIn: userInfo.LoggedIn,
+	}
 
-	return json.Marshal(userInfo)
+	return json.Marshal(userResponse)
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -17,6 +18,9 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
+
+//go:embed static/*
+var staticFiles embed.FS
 
 var logger = log.GetLogger()
 
@@ -119,6 +123,7 @@ func main() {
 
 	// Create proxy handler for auth routes (this is the same proxy instance used by middleware)
 	proxyHandler := proxy.NewProxy(cfg, sessionManager)
+	proxyHandler.SetStaticFiles(staticFiles)
 
 	// Setup router
 	r := mux.NewRouter()

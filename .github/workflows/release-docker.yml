@@ -101,7 +101,7 @@ jobs:
           export GOARCH=${{ matrix.goarch }}
           ${{ matrix.goarm && format('export GOARM={0}', matrix.goarm) || '' }}
 
-          eval "go build ${LDFLAGS} -o dist/basic-auth-proxy-${{ matrix.suffix }} ./cmd"
+          eval "go build ${LDFLAGS} -o dist/basic-auth-proxy-${{ matrix.suffix }} ."
 
       - name: Generate checksums
         run: |

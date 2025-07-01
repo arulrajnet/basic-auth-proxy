@@ -45,11 +45,11 @@ for ARCH in "${ARCHS[@]}"; do
     GO_ARM=$(echo $GO_ARCH | awk -Fv '{print $2}')
     GOOS=${GO_OS} GOARCH=arm GOARM=${GO_ARM} CGO_ENABLED=0 go build \
       -ldflags="-X github.com/arulrajnet/basic-auth-proxy/pkg/version.VERSION=${VERSION}" \
-      -o "${RELEASE_DIR}/${BINARY}-${VERSION}.${ARCH}/${BINARY}" "${BASH_DIR}/cmd/main.go"
+      -o "${RELEASE_DIR}/${BINARY}-${VERSION}.${ARCH}/${BINARY}" "${BASH_DIR}/main.go"
   else
     GOOS=${GO_OS} GOARCH=${GO_ARCH} CGO_ENABLED=0 go build \
       -ldflags="-X github.com/arulrajnet/basic-auth-proxy/pkg/version.VERSION=${VERSION}" \
-      -o "${RELEASE_DIR}/${BINARY}-${VERSION}.${ARCH}/${BINARY}" "${BASH_DIR}/cmd/main.go"
+      -o "${RELEASE_DIR}/${BINARY}-${VERSION}.${ARCH}/${BINARY}" "${BASH_DIR}/main.go"
   fi
 
   # Stay in the script directory and use absolute paths

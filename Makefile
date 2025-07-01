@@ -14,7 +14,7 @@ BINARY_NAME=basic-auth-proxy
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
 # Main package path
-MAIN_PACKAGE=./cmd
+MAIN_PACKAGE=.
 
 # All packages
 PACKAGES=$(shell go list ./... | grep -v /vendor/)

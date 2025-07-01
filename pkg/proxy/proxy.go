@@ -1,8 +1,10 @@
 package proxy
 
 import (
+	"embed"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -22,6 +24,7 @@ type Proxy struct {
 	sessionManager *session.SessionManager
 	reverseProxy   *httputil.ReverseProxy
 	proxyPrefix    string
+	staticFiles    embed.FS
 }
 
 func NewProxy(config *Config, sessionManager *session.SessionManager) *Proxy {
@@ -99,6 +102,11 @@ func NewProxy(config *Config, sessionManager *session.SessionManager) *Proxy {
 	}
 
 	return p
+}
+
+// SetStaticFiles configures the embedded static files for the proxy
+func (p *Proxy) SetStaticFiles(staticFiles embed.FS) {
+	p.staticFiles = staticFiles
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -184,6 +192,14 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // Handle sign-in requests (both GET for form and POST for credentials)
 func (p *Proxy) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
+		// Check if user is already authenticated
+		if userInfo, err := p.sessionManager.GetUserInfo(r, p.config.Cookie.Name); err == nil && userInfo != nil {
+			// User is already logged in, redirect to root
+			redirectPath := "/"
+			http.Redirect(w, r, redirectPath, http.StatusFound)
+			return
+		}
+
 		// Serve the login page
 		p.serveLoginPage(w, r)
 		return
@@ -371,19 +387,39 @@ func (p *Proxy) handleStaticFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create file server with the static directory
-	fileServer := http.FileServer(http.Dir("static"))
-
-	// Create a new request with the cleaned path
-	r.URL.Path = "/" + filePath
-
 	// Add security headers for static files
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("X-XSS-Protection", "1; mode=block")
 
-	// Serve the file
-	fileServer.ServeHTTP(w, r)
+	// Use embedded static files if available, fallback to filesystem
+	if p.staticFiles != (embed.FS{}) {
+		// Get the embedded static filesystem rooted at static
+		staticFS, err := fs.Sub(p.staticFiles, "static")
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to get embedded static filesystem")
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		// Create file server with the embedded filesystem
+		fileServer := http.FileServer(http.FS(staticFS))
+
+		// Create a new request with the cleaned path
+		r.URL.Path = "/" + filePath
+
+		// Serve the file
+		fileServer.ServeHTTP(w, r)
+	} else {
+		// Fallback to regular filesystem
+		fileServer := http.FileServer(http.Dir("static"))
+
+		// Create a new request with the cleaned path
+		r.URL.Path = "/" + filePath
+
+		// Serve the file
+		fileServer.ServeHTTP(w, r)
+	}
 }
 
 // Validate user credentials against upstream server
