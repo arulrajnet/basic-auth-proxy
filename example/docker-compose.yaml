@@ -1,0 +1,29 @@
+services:
+
+  # Basic Auth Proxy Service build for host machine architecture for development
+  proxy:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        GIT_COMMIT: ${GIT_COMMIT}
+        VERSION: ${VERSION}
+        TARGETPLATFORM: ${TARGETPLATFORM}
+    image: arulrajnet/basic-auth-proxy:dev
+    ports:
+      - "80:80"
+    command:
+      - basic-auth-proxy
+      - --address=0.0.0.0
+      - --port=80
+      - --proxy-prefix=/auth/
+      - --upstream=http://nagios_legacy:80/
+      - --log-level=debug
+
+  nagios_legacy:
+    image: jasonrivers/nagios:latest
+    ports:
+      - 80
+    environment:
+      NAGIOSADMIN_USER: nagiosadmin
+      NAGIOSADMIN_PASS: nagiosadmin

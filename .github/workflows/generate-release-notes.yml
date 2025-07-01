@@ -1,0 +1,241 @@
+name: Generate Release Notes
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to generate notes for'
+        required: true
+        type: string
+      previous_tag:
+        description: 'Previous release tag (optional - will auto-detect if not provided)'
+        required: false
+        type: string
+
+jobs:
+  generate-release-notes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag }}
+
+      - name: Get previous release tag
+        id: previous_tag
+        run: |
+          if [ -n "${{ inputs.previous_tag }}" ]; then
+            PREVIOUS_TAG="${{ inputs.previous_tag }}"
+          else
+            PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -v "${{ inputs.tag }}" | head -n 1)
+          fi
+          echo "previous_tag=${PREVIOUS_TAG}" >> $GITHUB_OUTPUT
+          echo "Previous release tag: ${PREVIOUS_TAG}"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          CURRENT_TAG="${{ inputs.tag }}"
+          PREVIOUS_TAG="${{ steps.previous_tag.outputs.previous_tag }}"
+
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "No previous release found, generating changelog from initial commit"
+            CHANGELOG=$(git log --pretty=format:"* %s ([%h](https://github.com/${{ github.repository }}/commit/%H)) - %an" --reverse)
+          else
+            echo "Generating changelog from $PREVIOUS_TAG to $CURRENT_TAG"
+            CHANGELOG=$(git log ${PREVIOUS_TAG}..${CURRENT_TAG} --pretty=format:"* %s ([%h](https://github.com/${{ github.repository }}/commit/%H)) - %an" --reverse)
+          fi
+
+          # Count commits
+          if [ -z "$PREVIOUS_TAG" ]; then
+            COMMIT_COUNT=$(git rev-list --count HEAD)
+          else
+            COMMIT_COUNT=$(git rev-list --count ${PREVIOUS_TAG}..${CURRENT_TAG})
+          fi
+
+          # Save changelog to file
+          cat > release_notes.md << 'EOF'
+          ## 🚀 Release ${{ inputs.tag }}
+
+          EOF
+
+          if [ "$COMMIT_COUNT" -gt 0 ]; then
+            echo "This release includes **${COMMIT_COUNT} commit(s)** since the previous release." >> release_notes.md
+          else
+            echo "This is a maintenance release with no new commits." >> release_notes.md
+          fi
+
+          echo "" >> release_notes.md
+          echo "## 📝 What's Changed" >> release_notes.md
+          echo "" >> release_notes.md
+
+          if [ -z "$CHANGELOG" ]; then
+            echo "* No changes since previous release" >> release_notes.md
+          else
+            echo "$CHANGELOG" >> release_notes.md
+          fi
+
+          echo "" >> release_notes.md
+
+      - name: Generate contributors
+        run: |
+          CURRENT_TAG="${{ inputs.tag }}"
+          PREVIOUS_TAG="${{ steps.previous_tag.outputs.previous_tag }}"
+
+          if [ -z "$PREVIOUS_TAG" ]; then
+            CONTRIBUTORS=$(git log --pretty=format:"%an|%ae" | sort -u)
+          else
+            CONTRIBUTORS=$(git log ${PREVIOUS_TAG}..${CURRENT_TAG} --pretty=format:"%an|%ae" | sort -u)
+          fi
+
+          echo "## 👥 Contributors" >> release_notes.md
+          echo "" >> release_notes.md
+
+          if [ -z "$CONTRIBUTORS" ]; then
+            echo "* No new contributors in this release" >> release_notes.md
+          else
+            echo "Thank you to all the contributors who made this release possible:" >> release_notes.md
+            echo "" >> release_notes.md
+            while IFS='|' read -r name email; do
+              # Try to extract GitHub username from email or use name
+              if [[ "$email" == *"@users.noreply.github.com" ]]; then
+                github_user=$(echo "$email" | sed 's/@users.noreply.github.com//' | sed 's/^[0-9]*+//')
+              else
+                # Fallback to name-based username (this might not always work)
+                github_user=$(echo "$name" | tr '[:upper:]' '[:lower:]' | sed 's/ //g')
+              fi
+              echo "* **$name** - [@$github_user](https://github.com/$github_user)" >> release_notes.md
+            done <<< "$CONTRIBUTORS"
+          fi
+
+          echo "" >> release_notes.md
+
+      - name: Add download section
+        run: |
+          echo "## 📦 Downloads" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Binaries" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "Choose the appropriate binary for your platform:" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "| Platform | Architecture | Download | Checksum |" >> release_notes.md
+          echo "|----------|--------------|----------|----------|" >> release_notes.md
+
+          # Linux binaries
+          echo "| Linux | x86_64 | [basic-auth-proxy-linux-amd64](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-amd64) | [SHA256](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-amd64.sha256) |" >> release_notes.md
+          echo "| Linux | ARM64 | [basic-auth-proxy-linux-arm64](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-arm64) | [SHA256](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-arm64.sha256) |" >> release_notes.md
+          echo "| Linux | ARMv7 | [basic-auth-proxy-linux-armv7](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-armv7) | [SHA256](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-armv7.sha256) |" >> release_notes.md
+          echo "| Linux | ARMv6 | [basic-auth-proxy-linux-armv6](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-armv6) | [SHA256](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-armv6.sha256) |" >> release_notes.md
+          echo "| Linux | ARMv5 | [basic-auth-proxy-linux-armv5](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-armv5) | [SHA256](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-armv5.sha256) |" >> release_notes.md
+          echo "| Linux | i386 | [basic-auth-proxy-linux-386](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-386) | [SHA256](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-386.sha256) |" >> release_notes.md
+          echo "| Linux | PowerPC64LE | [basic-auth-proxy-linux-ppc64le](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-ppc64le) | [SHA256](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-ppc64le.sha256) |" >> release_notes.md
+          echo "| Linux | s390x | [basic-auth-proxy-linux-s390x](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-s390x) | [SHA256](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-s390x.sha256) |" >> release_notes.md
+          echo "| Linux | RISC-V 64 | [basic-auth-proxy-linux-riscv64](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-riscv64) | [SHA256](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-riscv64.sha256) |" >> release_notes.md
+
+          # macOS binaries
+          echo "| macOS | Intel | [basic-auth-proxy-darwin-amd64](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-darwin-amd64) | [SHA256](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-darwin-amd64.sha256) |" >> release_notes.md
+          echo "| macOS | Apple Silicon | [basic-auth-proxy-darwin-arm64](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-darwin-arm64) | [SHA256](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-darwin-arm64.sha256) |" >> release_notes.md
+
+          # Windows binaries
+          echo "| Windows | x86_64 | [basic-auth-proxy-windows-amd64.exe](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-windows-amd64.exe) | [SHA256](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-windows-amd64.exe.sha256) |" >> release_notes.md
+          echo "| Windows | i386 | [basic-auth-proxy-windows-386.exe](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-windows-386.exe) | [SHA256](https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-windows-386.exe.sha256) |" >> release_notes.md
+
+          echo "" >> release_notes.md
+          echo "### Docker Images" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "\`\`\`bash" >> release_notes.md
+          echo "# Pull specific version" >> release_notes.md
+          echo "docker pull arulrajnet/basic-auth-proxy:${{ inputs.tag }}" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "# Pull latest" >> release_notes.md
+          echo "docker pull arulrajnet/basic-auth-proxy:latest" >> release_notes.md
+          echo "\`\`\`" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "**Supported Docker platforms:** linux/amd64, linux/arm64, linux/arm/v7, linux/arm/v6, linux/arm/v5, linux/386, linux/ppc64le, linux/s390x, linux/riscv64" >> release_notes.md
+
+      - name: Add installation instructions
+        run: |
+          echo "" >> release_notes.md
+          echo "## 🔧 Installation & Usage" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Binary Installation" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "\`\`\`bash" >> release_notes.md
+          echo "# Download binary (Linux x86_64 example)" >> release_notes.md
+          echo "wget https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-amd64" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "# Make executable" >> release_notes.md
+          echo "chmod +x basic-auth-proxy-linux-amd64" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "# Run" >> release_notes.md
+          echo "./basic-auth-proxy-linux-amd64 --help" >> release_notes.md
+          echo "\`\`\`" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Docker Installation" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "\`\`\`bash" >> release_notes.md
+          echo "# Run with config file" >> release_notes.md
+          echo "docker run -d \\" >> release_notes.md
+          echo "  --name basic-auth-proxy \\" >> release_notes.md
+          echo "  -p 8080:8080 \\" >> release_notes.md
+          echo "  -v \$(pwd)/config.yaml:/app/config.yaml \\" >> release_notes.md
+          echo "  arulrajnet/basic-auth-proxy:${{ inputs.tag }}" >> release_notes.md
+          echo "\`\`\`" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Verification" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "\`\`\`bash" >> release_notes.md
+          echo "# Verify binary checksum" >> release_notes.md
+          echo "wget https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/basic-auth-proxy-linux-amd64.sha256" >> release_notes.md
+          echo "sha256sum -c basic-auth-proxy-linux-amd64.sha256" >> release_notes.md
+          echo "\`\`\`" >> release_notes.md
+
+      - name: Update release description
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const releaseNotes = fs.readFileSync('release_notes.md', 'utf8');
+
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: '${{ inputs.tag }}'
+            });
+
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.id,
+              body: releaseNotes
+            });
+
+            console.log('✅ Release notes updated successfully!');
+
+      - name: Create summary
+        run: |
+          echo "## 📝 Release Notes Generated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Release:** ${{ inputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Previous Release:** ${{ steps.previous_tag.outputs.previous_tag || 'Initial Release' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Generated Content:**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Changelog from git commits" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Contributors list" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Binary download links" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Docker image information" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Installation instructions" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Verification steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The release description has been updated with comprehensive release notes." >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload release notes as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes-${{ inputs.tag }}
+          path: release_notes.md
+          retention-days: 30

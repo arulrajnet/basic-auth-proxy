@@ -1,0 +1,232 @@
+name: Build Cross-Platform Binaries
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'main.go'
+      - 'pkg/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Makefile'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'main.go'
+      - 'pkg/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Makefile'
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Platforms to build (comma-separated, or "all" for all platforms)'
+        required: false
+        default: 'linux/amd64,darwin/amd64,windows/amd64'
+        type: string
+
+jobs:
+  build-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Set build matrix
+        id: set-matrix
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.platforms }}" = "all" ]; then
+            # All platforms for manual dispatch
+            MATRIX='[{"goos": "linux", "goarch": "amd64", "suffix": "linux-amd64"},{"goos": "linux", "goarch": "arm64", "suffix": "linux-arm64"},{"goos": "linux", "goarch": "arm", "goarm": "7", "suffix": "linux-armv7"},{"goos": "linux", "goarch": "arm", "goarm": "6", "suffix": "linux-armv6"},{"goos": "linux", "goarch": "arm", "goarm": "5", "suffix": "linux-armv5"},{"goos": "linux", "goarch": "386", "suffix": "linux-386"},{"goos": "linux", "goarch": "ppc64le", "suffix": "linux-ppc64le"},{"goos": "linux", "goarch": "s390x", "suffix": "linux-s390x"},{"goos": "linux", "goarch": "riscv64", "suffix": "linux-riscv64"},{"goos": "darwin", "goarch": "amd64", "suffix": "darwin-amd64"},{"goos": "darwin", "goarch": "arm64", "suffix": "darwin-arm64"},{"goos": "windows", "goarch": "amd64", "suffix": "windows-amd64.exe"},{"goos": "windows", "goarch": "386", "suffix": "windows-386.exe"}]'
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Custom platforms for manual dispatch
+            PLATFORMS="${{ inputs.platforms }}"
+            MATRIX_ITEMS=()
+            IFS=',' read -ra ADDR <<< "$PLATFORMS"
+            for platform in "${ADDR[@]}"; do
+              # Trim whitespace
+              platform=$(echo "$platform" | xargs)
+              IFS='/' read -ra PARTS <<< "$platform"
+              GOOS="${PARTS[0]}"
+              GOARCH="${PARTS[1]}"
+
+              if [ "$GOOS" = "windows" ]; then
+                SUFFIX="$GOOS-$GOARCH.exe"
+              else
+                SUFFIX="$GOOS-$GOARCH"
+              fi
+
+              MATRIX_ITEMS+=("{\"goos\": \"$GOOS\", \"goarch\": \"$GOARCH\", \"suffix\": \"$SUFFIX\"}")
+            done
+
+            # Join array elements with commas
+            MATRIX_CONTENT=$(IFS=','; echo "${MATRIX_ITEMS[*]}")
+            MATRIX="[$MATRIX_CONTENT]"
+          else
+            # Limited platforms for automatic builds
+            MATRIX='[{"goos": "linux", "goarch": "amd64", "suffix": "linux-amd64"},{"goos": "darwin", "goarch": "amd64", "suffix": "darwin-amd64"},{"goos": "windows", "goarch": "amd64", "suffix": "windows-amd64.exe"}]'
+          fi
+
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "Build matrix: $MATRIX"
+
+  build:
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.build-matrix.outputs.matrix) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev-$(git rev-parse --short HEAD)")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Build binary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          LDFLAGS="-ldflags \"-X github.com/arulrajnet/basic-auth-proxy/pkg/version.VERSION=${VERSION} -extldflags '-static'\""
+
+          mkdir -p dist
+
+          export GOOS=${{ matrix.goos }}
+          export GOARCH=${{ matrix.goarch }}
+          ${{ matrix.goarm && format('export GOARM={0}', matrix.goarm) || '' }}
+
+          echo "Building for $GOOS/$GOARCH..."
+          eval "go build ${LDFLAGS} -o dist/basic-auth-proxy-${{ matrix.suffix }} ."
+
+          # Verify the binary was created
+          if [ -f "dist/basic-auth-proxy-${{ matrix.suffix }}" ]; then
+            echo "✅ Binary built successfully"
+            ls -la "dist/basic-auth-proxy-${{ matrix.suffix }}"
+          else
+            echo "❌ Binary build failed"
+            exit 1
+          fi
+
+      - name: Test binary (Linux only)
+        if: matrix.goos == 'linux'
+        run: |
+          chmod +x dist/basic-auth-proxy-${{ matrix.suffix }}
+          # Test help command
+          timeout 5 ./dist/basic-auth-proxy-${{ matrix.suffix }} --help || echo "Help command test completed"
+          # Test version command
+          timeout 5 ./dist/basic-auth-proxy-${{ matrix.suffix }} --version || echo "Version command test completed"
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum basic-auth-proxy-${{ matrix.suffix }} > basic-auth-proxy-${{ matrix.suffix }}.sha256
+          echo "Generated checksum:"
+          cat basic-auth-proxy-${{ matrix.suffix }}.sha256
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: basic-auth-proxy-${{ matrix.suffix }}
+          path: |
+            dist/basic-auth-proxy-${{ matrix.suffix }}
+            dist/basic-auth-proxy-${{ matrix.suffix }}.sha256
+          retention-days: 7
+
+  create-summary:
+    needs: [build-matrix, build]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create build summary
+        run: |
+          echo "## 🔨 Cross-Platform Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.build.result }}" = "success" ]; then
+            echo "**Status:** ✅ All builds successful" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Status:** ❌ Some builds failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Built Artifacts:**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # List all artifacts
+          for dir in artifacts/*/; do
+            if [ -d "$dir" ]; then
+              artifact_name=$(basename "$dir")
+              echo "- $artifact_name" >> $GITHUB_STEP_SUMMARY
+
+              # Show file size if available
+              binary_file="$dir/basic-auth-proxy-*"
+              if ls $binary_file 1> /dev/null 2>&1; then
+                for file in $binary_file; do
+                  if [ -f "$file" ] && [[ ! "$file" == *.sha256 ]]; then
+                    size=$(du -h "$file" | cut -f1)
+                    echo "  - Size: $size" >> $GITHUB_STEP_SUMMARY
+                    break
+                  fi
+                done
+              fi
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Download Instructions:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Go to the 'Artifacts' section of this workflow run" >> $GITHUB_STEP_SUMMARY
+          echo "2. Download the appropriate artifact for your platform" >> $GITHUB_STEP_SUMMARY
+          echo "3. Extract and make the binary executable (Linux/macOS): \`chmod +x basic-auth-proxy-*\`" >> $GITHUB_STEP_SUMMARY
+          echo "4. Run: \`./basic-auth-proxy-* --help\`" >> $GITHUB_STEP_SUMMARY
+
+  test-integration:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Download Linux amd64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: basic-auth-proxy-linux-amd64
+          path: .
+
+      - name: Basic integration test
+        run: |
+          chmod +x basic-auth-proxy-linux-amd64
+
+          echo "Testing binary execution..."
+
+          # Test version
+          if ./basic-auth-proxy-linux-amd64 --version; then
+            echo "✅ Version command works"
+          else
+            echo "❌ Version command failed"
+            exit 1
+          fi
+
+          # Test help
+          if ./basic-auth-proxy-linux-amd64 --help; then
+            echo "✅ Help command works"
+          else
+            echo "❌ Help command failed"
+            exit 1
+          fi
+
+          echo "✅ Basic integration tests passed"

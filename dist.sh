@@ -3,7 +3,10 @@
 set -o errexit
 # set -x
 
+BASH_DIR=$(dirname $(realpath "${BASH_SOURCE}"))
 BINARY=${BINARY:-basic-auth-proxy}
+VERSION=${VERSION:-$(git describe --tags --always --dirty)}
+RELEASE_DIR="${BASH_DIR}/release"
 
 if [[ -z ${BINARY} ]] || [[ -z ${VERSION} ]]; then
   echo "Missing required env var: BINARY=X VERSION=X $(basename $0)"
@@ -27,12 +30,12 @@ ARCHS=(
   windows-386
 )
 
-rm -rf release
-mkdir -p release
+rm -rf "${RELEASE_DIR}"
+mkdir -p "${RELEASE_DIR}"
 
 # Create architecture specific release dirs
 for ARCH in "${ARCHS[@]}"; do
-  mkdir -p release/${BINARY}-${VERSION}.${ARCH}
+  mkdir -p "${RELEASE_DIR}/${BINARY}-${VERSION}.${ARCH}"
 
   GO_OS=$(echo $ARCH | awk -F- '{print $1}')
   GO_ARCH=$(echo $ARCH | awk -F- '{print $2}')
@@ -42,14 +45,15 @@ for ARCH in "${ARCHS[@]}"; do
     GO_ARM=$(echo $GO_ARCH | awk -Fv '{print $2}')
     GOOS=${GO_OS} GOARCH=arm GOARM=${GO_ARM} CGO_ENABLED=0 go build \
       -ldflags="-X github.com/arulrajnet/basic-auth-proxy/pkg/version.VERSION=${VERSION}" \
-      -o release/${BINARY}-${VERSION}.${ARCH}/${BINARY} ./cmd/main.go
+      -o "${RELEASE_DIR}/${BINARY}-${VERSION}.${ARCH}/${BINARY}" "${BASH_DIR}/main.go"
   else
     GOOS=${GO_OS} GOARCH=${GO_ARCH} CGO_ENABLED=0 go build \
       -ldflags="-X github.com/arulrajnet/basic-auth-proxy/pkg/version.VERSION=${VERSION}" \
-      -o release/${BINARY}-${VERSION}.${ARCH}/${BINARY} ./cmd/main.go
+      -o "${RELEASE_DIR}/${BINARY}-${VERSION}.${ARCH}/${BINARY}" "${BASH_DIR}/main.go"
   fi
 
-  cd release
+  # Stay in the script directory and use absolute paths
+  pushd "${RELEASE_DIR}" > /dev/null
 
   # Create tar file for architecture specific binary
   tar -czvf ${BINARY}-${VERSION}.${ARCH}.tar.gz ${BINARY}-${VERSION}.${ARCH}
@@ -60,5 +64,5 @@ for ARCH in "${ARCHS[@]}"; do
   # Create sha256sum for architecture specific binary
   sha256sum ${BINARY}-${VERSION}.${ARCH}/${BINARY} > ${BINARY}-${VERSION}.${ARCH}-sha256sum.txt
 
-  cd ..
+  popd > /dev/null
 done

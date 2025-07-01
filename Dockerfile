@@ -1,5 +1,6 @@
 # Docker multi-stage build
-FROM --platform=${BUILDPLATFORM} golang:1.24.0-bookworm AS base
+# Set the BUILDPLATFORM as linux/amd64 and get the TARGETPLATFORM from build args
+FROM --platform=linux/amd64 golang:1.24.0-bookworm AS base
 
 ARG GIT_COMMIT=unspecified
 ARG BUILD_IMAGE_ID=unspecified
@@ -37,12 +38,17 @@ RUN case ${TARGETPLATFORM} in \
         "windows/386") GOOS=windows GOARCH=386  ;; \
     esac && \
     printf "Building basic-auth-proxy for OS: ${GOOS}, Arch: ${GOARCH}\n" && \
-    GOOS=${GOOS} GOARCH=${GOARCH} VERSION=${VERSION} make build_binary
+    CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} VERSION=${VERSION} make build
 
 # Final image
 FROM scratch AS final
 LABEL maintainer="Arulraj V <me@arulraj.net>"
-COPY --from=base /app/dist/basic-auth-proxy /usr/bin/basic-auth-proxy
+
+ARG VERSION=unspecified
+ENV VERSION=${VERSION}
+
+WORKDIR /app
+COPY --from=base /app/build/basic-auth-proxy /usr/bin/basic-auth-proxy
 
 LABEL org.opencontainers.image.licenses=MIT \
       org.opencontainers.image.description="A Secure and Brandable Reverse Proxy for Upstream Services with Basic Auth." \

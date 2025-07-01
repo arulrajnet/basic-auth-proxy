@@ -1,0 +1,28 @@
+proxy:
+  address: "0.0.0.0"
+  port: 8080
+  prefix: "/auth"
+  timeout: 30  # Timeout in seconds
+
+upstreams:
+  - url: "http://localhost:8081"
+    timeout: 30  # Timeout in seconds for this upstream
+
+cookie:
+  name: "basic_auth_proxy_auth"
+  secret_key: "super-secret-key-change-me-in-production"
+  domain: "localhost"
+  path: "/"
+  secure: false
+  http_only: true
+  max_age: 86400 # 24 Hours
+  same_site: "lax"
+
+custom_page:
+  logo: "https://via.placeholder.com/120x60?text=Logo"
+  template_dir: "" # Leave empty to use the default template
+  footer_text: ""
+
+log_level: "info"
+proxy_path: "/"  # Set to empty or "/" for no prefix
+footer_text: "Powered by ProxyAuth"  # Leave empty for default footer

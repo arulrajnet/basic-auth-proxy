@@ -48,3 +48,8 @@ RemoteSystemsTempFiles
 !/.vscode/tasks.json
 !/.vscode/launch.json
 !/.vscode/extensions.json
+
+# Other files
+release
+build
+dist
