@@ -47,6 +47,7 @@ jobs:
           context: .
           platforms: linux/amd64
           push: false
+          load: true
           tags: ${{ env.IMAGE_NAME }}:test
           build-args: |
             VERSION=${{ steps.build_info.outputs.version }}
