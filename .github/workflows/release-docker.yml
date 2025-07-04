@@ -97,6 +97,7 @@ jobs:
 
           mkdir -p dist
 
+          export CGO_ENABLED=0
           export GOOS=${{ matrix.goos }}
           export GOARCH=${{ matrix.goarch }}
           ${{ matrix.goarm && format('export GOARM={0}', matrix.goarm) || '' }}
