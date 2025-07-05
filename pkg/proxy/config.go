@@ -121,6 +121,11 @@ func LoadConfig(configFile string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// Post-process configuration to handle URL parsing from environment variables
+	if err := processURLs(v, config); err != nil {
+		return nil, fmt.Errorf("failed to process URLs: %w", err)
+	}
+
 	return config, nil
 }
 
@@ -146,7 +151,32 @@ func bindEnvs(v *viper.Viper, config *Config) {
 	v.BindEnv("cookie.max_age", "BAP_COOKIE_MAX_AGE")
 	v.BindEnv("cookie.same_site", "BAP_COOKIE_SAME_SITE")
 
-	// Bind upstreams as individual environment variables
+	// Bind upstreams as strings to be processed later
 	v.BindEnv("upstreams.0.url", "BAP_UPSTREAM_URL")
 	v.BindEnv("upstreams.0.timeout", "BAP_UPSTREAM_TIMEOUT")
+}
+
+// processURLs handles parsing of URL strings from environment variables
+func processURLs(v *viper.Viper, config *Config) error {
+	// Process upstream URL from environment variable
+	if upstreamURLStr := v.GetString("upstreams.0.url"); upstreamURLStr != "" {
+		parsedURL, err := url.Parse(upstreamURLStr)
+		if err != nil {
+			return fmt.Errorf("failed to parse upstream URL '%s': %w", upstreamURLStr, err)
+		}
+
+		// Ensure upstreams slice has at least one element
+		if len(config.Upstreams) == 0 {
+			config.Upstreams = append(config.Upstreams, Upstream{})
+		}
+
+		config.Upstreams[0].URL = parsedURL
+
+		// Set timeout if specified
+		if timeout := v.GetInt("upstreams.0.timeout"); timeout > 0 {
+			config.Upstreams[0].Timeout = timeout
+		}
+	}
+
+	return nil
 }

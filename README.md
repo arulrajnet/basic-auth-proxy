@@ -164,11 +164,12 @@ Options:
 
 ## Roadmap
 
-- [ ] Support for SSL/TLS encryption
-- [ ] Support for Let's Encrypt automatic certificate management
-- [ ] Support for multiple upstream services
-- [ ] Support for configurable cookie flags (secure, httpOnly, sameSite)
-- [ ] Run behind another reverse proxy (X-Forwarded-For support)
+- [ ] Support for SSL/TLS encryption.
+- [ ] Automatic self signed certificate by default.
+- [ ] Support for Let's Encrypt automatic certificate management. Integrate lego.
+- [ ] Support for multiple upstream services.
+- [ ] Support for configurable all settings via flags and environmental variables.
+- [ ] Run behind another reverse proxy (X-Forwarded-For support).
 
 
 
