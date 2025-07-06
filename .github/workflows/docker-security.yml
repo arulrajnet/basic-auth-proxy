@@ -22,6 +22,9 @@ env:
 jobs:
   dockerfile-lint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

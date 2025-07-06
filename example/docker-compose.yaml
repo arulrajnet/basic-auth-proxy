@@ -11,14 +11,22 @@ services:
         TARGETPLATFORM: ${TARGETPLATFORM}
     image: arulrajnet/basic-auth-proxy:dev
     ports:
-      - "80:80"
+      - "8080:8080"
     command:
       - basic-auth-proxy
       - --address=0.0.0.0
-      - --port=80
-      - --proxy-prefix=/auth/
+      - --port=8080
+      - --proxy-prefix=/_auth/
       - --upstream=http://nagios_legacy:80/
       - --log-level=debug
+    # environment:
+    #   BAP_PROXY_ADDRESS: "0.0.0.0"
+    #   BAP_PROXY_PORT: "8080"
+    #   BAP_PROXY_PREFIX: "/_auth/"
+    #   BAP_UPSTREAM_URL: "http://nagios_legacy:80/"
+    #   BAP_LOG_LEVEL: "debug"
+    # volumes:
+    #   - ./../config.yaml:/app/config.yaml
 
   nagios_legacy:
     image: jasonrivers/nagios:latest
