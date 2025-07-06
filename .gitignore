@@ -50,6 +50,7 @@ RemoteSystemsTempFiles
 !/.vscode/extensions.json
 
 # Other files
+basic-auth-proxy
 release
 build
 dist

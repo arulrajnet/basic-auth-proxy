@@ -26,8 +26,9 @@ type ProxyConfig struct {
 
 // Upstream defines the structure for each upstream service.
 type Upstream struct {
-	URL     *url.URL `yaml:"url" mapstructure:"url"`
-	Timeout int      `yaml:"timeout" mapstructure:"timeout"` // Timeout in seconds
+	URL     *url.URL `yaml:"-" mapstructure:"-"`                        // Parsed URL (not directly unmarshaled)
+	URLStr  string   `yaml:"url" mapstructure:"url"`                    // Raw URL string for unmarshaling
+	Timeout int      `yaml:"timeout" mapstructure:"timeout"`            // Timeout in seconds
 }
 
 type CustomPage struct {
@@ -156,25 +157,55 @@ func bindEnvs(v *viper.Viper, config *Config) {
 	v.BindEnv("upstreams.0.timeout", "BAP_UPSTREAM_TIMEOUT")
 }
 
-// processURLs handles parsing of URL strings from environment variables
+// processURLs handles parsing of URL strings from config and environment variables
 func processURLs(v *viper.Viper, config *Config) error {
-	// Process upstream URL from environment variable
-	if upstreamURLStr := v.GetString("upstreams.0.url"); upstreamURLStr != "" {
-		parsedURL, err := url.Parse(upstreamURLStr)
-		if err != nil {
-			return fmt.Errorf("failed to parse upstream URL '%s': %w", upstreamURLStr, err)
+	// Process all upstream URLs
+	for i := range config.Upstreams {
+		var urlStr string
+
+		// First check if there's a URL string from config file
+		if config.Upstreams[i].URLStr != "" {
+			urlStr = config.Upstreams[i].URLStr
 		}
 
-		// Ensure upstreams slice has at least one element
-		if len(config.Upstreams) == 0 {
-			config.Upstreams = append(config.Upstreams, Upstream{})
+		// Override with environment variable if present (only for first upstream for now)
+		if i == 0 {
+			if envURL := v.GetString("upstreams.0.url"); envURL != "" {
+				urlStr = envURL
+			}
 		}
 
-		config.Upstreams[0].URL = parsedURL
+		// Parse the URL if we have one
+		if urlStr != "" {
+			parsedURL, err := url.Parse(urlStr)
+			if err != nil {
+				return fmt.Errorf("failed to parse upstream URL '%s': %w", urlStr, err)
+			}
+			config.Upstreams[i].URL = parsedURL
+		}
+	}
 
-		// Set timeout if specified
-		if timeout := v.GetInt("upstreams.0.timeout"); timeout > 0 {
-			config.Upstreams[0].Timeout = timeout
+	// Handle case where environment variable is set but no upstreams in config
+	if len(config.Upstreams) == 0 {
+		if upstreamURLStr := v.GetString("upstreams.0.url"); upstreamURLStr != "" {
+			parsedURL, err := url.Parse(upstreamURLStr)
+			if err != nil {
+				return fmt.Errorf("failed to parse upstream URL '%s': %w", upstreamURLStr, err)
+			}
+
+			// Create new upstream from environment variable
+			upstream := Upstream{
+				URL:     parsedURL,
+				URLStr:  upstreamURLStr,
+				Timeout: v.GetInt("upstreams.0.timeout"),
+			}
+
+			// Set default timeout if not specified
+			if upstream.Timeout == 0 {
+				upstream.Timeout = 30
+			}
+
+			config.Upstreams = append(config.Upstreams, upstream)
 		}
 	}
 

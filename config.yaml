@@ -1,11 +1,11 @@
 proxy:
   address: "0.0.0.0"
   port: 8080
-  prefix: "/auth"
+  prefix: "/_auth/"
   timeout: 30  # Timeout in seconds
 
 upstreams:
-  - url: "http://localhost:8081"
+  - url: "http://nagios_legacy:80/"
     timeout: 30  # Timeout in seconds for this upstream
 
 cookie:
@@ -23,6 +23,4 @@ custom_page:
   template_dir: "" # Leave empty to use the default template
   footer_text: ""
 
-log_level: "info"
-proxy_path: "/"  # Set to empty or "/" for no prefix
-footer_text: "Powered by ProxyAuth"  # Leave empty for default footer
+log_level: "debug"

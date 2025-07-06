@@ -70,7 +70,7 @@ docker pull arulrajnet/basic-auth-proxy:latest
 # Run with minimal configuration
 docker run -p 8080:8080 \
   -e BAP_UPSTREAM_URL=http://your-backend-service:8081 \
-  -e BAP_PROXY_PREFIX=/auth \
+  -e BAP_PROXY_PREFIX=/_auth/ \
   -e BAP_PROXY_PORT=8080 \
   arulrajnet/basic-auth-proxy:latest
 ```
@@ -115,7 +115,7 @@ Create a configuration file to customize the proxy behavior:
 proxy:
   address: "0.0.0.0"
   port: 8080
-  prefix: "/auth"
+  prefix: "/_auth/"
   timeout: 30
 
 upstreams:
