@@ -156,7 +156,7 @@ func LoadConfig(configFile string) (*Config, error) {
 		config.CustomPage.Logo = strings.TrimSuffix(config.Proxy.ProxyPrefix, "/") + "/static/img/logo.svg"
 	}
 
-	logger.Info().Interface("config", config).Msg("loaded configuration")
+	logger.Info().Msg("loaded configuration")
 
 	// Post-process configuration to handle URL parsing from environment variables
 	if err := processURLs(v, config); err != nil {
