@@ -72,11 +72,16 @@ func NewProxy(config *Config, sessionManager *session.SessionManager) *Proxy {
 					}
 				}
 
-				// Remove sensitive headers
-				req.Header.Del("X-Forwarded-For")
-
-				// Set real client IP
-				req.Header.Set("X-Real-IP", req.RemoteAddr)
+				// Handle proxy headers based on trust configuration
+				if !config.Proxy.TrustUpstream {
+					// We are the edge proxy (or untrusted upstream). Do not trust incoming headers.
+					// Remove X-Forwarded-For to prevent spoofing
+					req.Header.Del("X-Forwarded-For")
+					req.Header.Del("X-Forwarded-Proto")
+					req.Header.Del("X-Forwarded-Port")
+					// Set Real-IP to the immediate caller
+					req.Header.Set("X-Real-IP", req.RemoteAddr)
+				}
 
 				// Set proxy prefix if needed
 				if p.proxyPrefix != "" && p.proxyPrefix != "/" {
@@ -314,18 +319,18 @@ func (p *Proxy) serveLoginPage(w http.ResponseWriter, r *http.Request, errorMsg 
 	// Data for the template
 	data := struct {
 		ProxyPrefix string
-		Logo       string
-		Year       int
-		Version    string
-		FooterText string
-		Error      string
+		Logo        string
+		Year        int
+		Version     string
+		FooterText  string
+		Error       string
 	}{
 		ProxyPrefix: p.proxyPrefix,
-		Logo:       p.config.CustomPage.Logo,
-		Year:       time.Now().Year(),
-		Version:    version.VERSION,
-		FooterText: p.config.CustomPage.FooterText,
-		Error:      "",
+		Logo:        p.config.CustomPage.Logo,
+		Year:        time.Now().Year(),
+		Version:     version.VERSION,
+		FooterText:  p.config.CustomPage.FooterText,
+		Error:       "",
 	}
 
 	// Set error message if provided as parameter or from query

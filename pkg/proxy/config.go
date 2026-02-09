@@ -20,17 +20,18 @@ type Config struct {
 }
 
 type ProxyConfig struct {
-	Address     string `yaml:"address" mapstructure:"address"`
-	Port        int    `yaml:"port" mapstructure:"port"`
-	Timeout     int    `yaml:"timeout" mapstructure:"timeout"` // Timeout in seconds
-	ProxyPrefix string `yaml:"prefix" mapstructure:"prefix"`
+	Address       string `yaml:"address" mapstructure:"address"`
+	Port          int    `yaml:"port" mapstructure:"port"`
+	Timeout       int    `yaml:"timeout" mapstructure:"timeout"` // Timeout in seconds
+	ProxyPrefix   string `yaml:"prefix" mapstructure:"prefix"`
+	TrustUpstream bool   `yaml:"trust_upstream" mapstructure:"trust_upstream"`
 }
 
 // Upstream defines the structure for each upstream service.
 type Upstream struct {
-	URL     *url.URL `yaml:"-" mapstructure:"-"`                        // Parsed URL (not directly unmarshaled)
-	URLStr  string   `yaml:"url" mapstructure:"url"`                    // Raw URL string for unmarshaling
-	Timeout int      `yaml:"timeout" mapstructure:"timeout"`            // Timeout in seconds
+	URL     *url.URL `yaml:"-" mapstructure:"-"`             // Parsed URL (not directly unmarshaled)
+	URLStr  string   `yaml:"url" mapstructure:"url"`         // Raw URL string for unmarshaling
+	Timeout int      `yaml:"timeout" mapstructure:"timeout"` // Timeout in seconds
 }
 
 type CustomPage struct {
@@ -56,10 +57,11 @@ func DefaultConfig() *Config {
 	proxyPrefix := "/auth" // Default proxy prefix
 	return &Config{
 		Proxy: ProxyConfig{
-			Address:     "0.0.0.0",
-			Port:        8080,
-			Timeout:     30,
-			ProxyPrefix: proxyPrefix,
+			Address:       "0.0.0.0",
+			Port:          8080,
+			Timeout:       30,
+			ProxyPrefix:   proxyPrefix,
+			TrustUpstream: false,
 		},
 		Upstreams: []Upstream{
 			{
@@ -131,18 +133,19 @@ func LoadConfig(configFile string) (*Config, error) {
 
 	// Bind pflags LAST (highest priority - overrides everything)
 	if pflag.CommandLine.Parsed() {
-			logger.Debug().Msg("Binding command line flags")
-			v.BindPFlag("proxy.address", pflag.Lookup("address"))
-			v.BindPFlag("proxy.port", pflag.Lookup("port"))
-			v.BindPFlag("proxy.prefix", pflag.Lookup("proxy-prefix"))
-			v.BindPFlag("log_level", pflag.Lookup("log-level"))
-			v.BindPFlag("upstreams.0.url", pflag.Lookup("upstream"))
-			v.BindPFlag("cookie.name", pflag.Lookup("cookie-name"))
-			v.BindPFlag("cookie.secret_key", pflag.Lookup("cookie-secret"))
-			v.BindPFlag("cookie.block_key", pflag.Lookup("cookie-block"))
-			v.BindPFlag("custom_page.logo", pflag.Lookup("logo"))
-			v.BindPFlag("custom_page.template_dir", pflag.Lookup("template-dir"))
-			v.BindPFlag("custom_page.footer_text", pflag.Lookup("footer-text"))
+		logger.Debug().Msg("Binding command line flags")
+		v.BindPFlag("proxy.address", pflag.Lookup("address"))
+		v.BindPFlag("proxy.port", pflag.Lookup("port"))
+		v.BindPFlag("proxy.prefix", pflag.Lookup("proxy-prefix"))
+		v.BindPFlag("proxy.trust_upstream", pflag.Lookup("trust-upstream"))
+		v.BindPFlag("log_level", pflag.Lookup("log-level"))
+		v.BindPFlag("upstreams.0.url", pflag.Lookup("upstream"))
+		v.BindPFlag("cookie.name", pflag.Lookup("cookie-name"))
+		v.BindPFlag("cookie.secret_key", pflag.Lookup("cookie-secret"))
+		v.BindPFlag("cookie.block_key", pflag.Lookup("cookie-block"))
+		v.BindPFlag("custom_page.logo", pflag.Lookup("logo"))
+		v.BindPFlag("custom_page.template_dir", pflag.Lookup("template-dir"))
+		v.BindPFlag("custom_page.footer_text", pflag.Lookup("footer-text"))
 	}
 
 	// Unmarshal config into struct
@@ -171,6 +174,7 @@ func bindEnvs(v *viper.Viper, config *Config) {
 	v.BindEnv("proxy.port", "BAP_PROXY_PORT")
 	v.BindEnv("proxy.timeout", "BAP_PROXY_TIMEOUT")
 	v.BindEnv("proxy.prefix", "BAP_PROXY_PREFIX")
+	v.BindEnv("proxy.trust_upstream", "BAP_PROXY_TRUST_UPSTREAM")
 
 	v.BindEnv("custom_page.logo", "BAP_CUSTOM_PAGE_LOGO")
 	v.BindEnv("custom_page.template_dir", "BAP_CUSTOM_PAGE_TEMPLATE_DIR")

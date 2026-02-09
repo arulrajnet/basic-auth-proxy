@@ -33,6 +33,7 @@ func main() {
 	pflag.StringP("address", "a", "", "address to listen on")
 	pflag.IntP("port", "p", 0, "port to listen on")
 	pflag.StringP("proxy-prefix", "P", "", "prefix path for the proxy")
+	pflag.BoolP("trust-upstream", "t", false, "trust upstream proxy (preserve X-Forwarded-For and X-Real-IP)")
 	pflag.StringP("upstream", "u", "", "upstream server URL")
 	pflag.StringP("cookie-name", "s", "", "cookie name")
 	pflag.StringP("cookie-secret", "S", "", "cookie secret key")
