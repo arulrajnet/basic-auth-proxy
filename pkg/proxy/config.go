@@ -137,7 +137,6 @@ func LoadConfig(configFile string) (*Config, error) {
 			v.BindPFlag("proxy.prefix", pflag.Lookup("proxy-prefix"))
 			v.BindPFlag("log_level", pflag.Lookup("log-level"))
 			v.BindPFlag("upstreams.0.url", pflag.Lookup("upstream"))
-			v.BindPFlag("upstreams.0.timeout", pflag.Lookup("upstream-timeout"))
 			v.BindPFlag("cookie.name", pflag.Lookup("cookie-name"))
 			v.BindPFlag("cookie.secret_key", pflag.Lookup("cookie-secret"))
 			v.BindPFlag("cookie.block_key", pflag.Lookup("cookie-block"))
