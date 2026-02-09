@@ -42,6 +42,7 @@ type CustomPage struct {
 type CookieConfig struct {
 	Name      string `yaml:"name" mapstructure:"name"`
 	SecretKey string `yaml:"secret_key" mapstructure:"secret_key"`
+	BlockKey  string `yaml:"block_key" mapstructure:"block_key"`
 	Domain    string `yaml:"domain" mapstructure:"domain"`
 	Path      string `yaml:"path" mapstructure:"path"`
 	Secure    bool   `yaml:"secure" mapstructure:"secure"`
@@ -139,6 +140,7 @@ func LoadConfig(configFile string) (*Config, error) {
 			v.BindPFlag("upstreams.0.timeout", pflag.Lookup("upstream-timeout"))
 			v.BindPFlag("cookie.name", pflag.Lookup("cookie-name"))
 			v.BindPFlag("cookie.secret_key", pflag.Lookup("cookie-secret"))
+			v.BindPFlag("cookie.block_key", pflag.Lookup("cookie-block"))
 			v.BindPFlag("custom_page.logo", pflag.Lookup("logo"))
 			v.BindPFlag("custom_page.template_dir", pflag.Lookup("template-dir"))
 			v.BindPFlag("custom_page.footer_text", pflag.Lookup("footer-text"))
@@ -179,6 +181,7 @@ func bindEnvs(v *viper.Viper, config *Config) {
 
 	v.BindEnv("cookie.name", "BAP_COOKIE_NAME")
 	v.BindEnv("cookie.secret_key", "BAP_COOKIE_SECRET_KEY")
+	v.BindEnv("cookie.block_key", "BAP_COOKIE_BLOCK_KEY")
 	v.BindEnv("cookie.domain", "BAP_COOKIE_DOMAIN")
 	v.BindEnv("cookie.path", "BAP_COOKIE_PATH")
 	v.BindEnv("cookie.secure", "BAP_COOKIE_SECURE")

@@ -36,6 +36,7 @@ func main() {
 	pflag.StringP("upstream", "u", "", "upstream server URL")
 	pflag.StringP("cookie-name", "s", "", "cookie name")
 	pflag.StringP("cookie-secret", "S", "", "cookie secret key")
+	pflag.StringP("cookie-block", "B", "", "cookie block key (encryption key, must be 32 bytes)")
 	pflag.StringP("logo", "L", "", "Path or URL for the login page logo")
 	pflag.StringP("template-dir", "T", "", "path to custom login template")
 	pflag.StringP("footer-text", "f", "", "footer text for the login page")
@@ -74,7 +75,7 @@ func main() {
 	log.SetLogLevel(cfg.LogLevel)
 
 	// Create session manager
-	sessionManager := session.NewSessionManager(cfg.Cookie.SecretKey)
+	sessionManager := session.NewSessionManager(cfg.Cookie.SecretKey, cfg.Cookie.BlockKey)
 
 	// Create proxy handler for auth routes (this is the same proxy instance used by middleware)
 	proxyHandler := proxy.NewProxy(cfg, sessionManager)

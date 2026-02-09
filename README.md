@@ -125,6 +125,7 @@ upstreams:
 cookie:
   name: "basic_auth_proxy_session"
   secret_key: "your-secret-key-here"
+  block_key: ""  # Optional: 32-byte encryption key (if not set, derived from secret_key)
   domain: "localhost"
   max_age: 86400  # 24 hours
   secure: false
@@ -153,6 +154,7 @@ Options:
   -P, --proxy-prefix string   Prefix path for the proxy
   -s, --cookie-name string    Cookie name for session
   -S, --cookie-secret string  Cookie secret key
+  -B, --cookie-block string   Cookie block key (encryption key, must be 32 bytes)
   -L, --logo string           Path or URL for login page logo
   -T, --template-dir string   Path to custom login template
   -f, --footer-text string    Footer text for login page

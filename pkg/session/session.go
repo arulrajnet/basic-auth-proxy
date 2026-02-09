@@ -32,18 +32,33 @@ type UserInfo struct {
 	LoggedIn time.Time `json:"logged_in"`
 }
 
-func NewSessionManager(secretKey string) *SessionManager {
-	// Create a new secure cookie encoder
+func NewSessionManager(secretKey, blockKey string) *SessionManager {
+	// Create hash key (for signing)
 	hashKey := []byte(secretKey)
 	if len(secretKey) < 32 {
 		// Ensure hash key is at least 32 bytes
 		hashKey = securecookie.GenerateRandomKey(64)
+		logger.Warn().Msg("Secret key is too short, generating random hash key. Sessions will not persist across restarts.")
 	}
-	// Derive block key from secret key
-	hash := sha256.Sum256([]byte(secretKey + ":block"))
-	blockKey := hash[:32]  // Use first 32 bytes
 
-	store := sessions.NewCookieStore(hashKey, blockKey)
+	// Create block key (for encryption)
+	var blockKeyBytes []byte
+	if blockKey != "" {
+		blockKeyBytes = []byte(blockKey)
+		if len(blockKey) != 32 {
+			logger.Warn().Msgf("Block key should be exactly 32 bytes (got %d). Deriving from secret key instead.", len(blockKey))
+			// Fallback to derived key
+			hash := sha256.Sum256([]byte(secretKey + ":block"))
+			blockKeyBytes = hash[:32]
+		}
+	} else {
+		logger.Info().Msg("No block key provided. Deriving block key from secret key.")
+		// Derive block key from secret key
+		hash := sha256.Sum256([]byte(secretKey + ":block"))
+		blockKeyBytes = hash[:32]
+	}
+
+	store := sessions.NewCookieStore(hashKey, blockKeyBytes)
 	return &SessionManager{
 		store:      store,
 		cookieName: "basic_auth_proxy_auth",

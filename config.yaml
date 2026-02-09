@@ -11,6 +11,7 @@ upstreams:
 cookie:
   name: "basic_auth_proxy_auth"
   secret_key: "super-secret-key-change-me-in-production"
+  block_key: "" # Optional: 32-byte encryption key. If not set, derived from secret_key
   domain: "localhost"
   path: "/"
   secure: false
