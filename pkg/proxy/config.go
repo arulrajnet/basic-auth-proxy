@@ -3,7 +3,9 @@ package proxy
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
@@ -40,6 +42,7 @@ type CustomPage struct {
 type CookieConfig struct {
 	Name      string `yaml:"name" mapstructure:"name"`
 	SecretKey string `yaml:"secret_key" mapstructure:"secret_key"`
+	BlockKey  string `yaml:"block_key" mapstructure:"block_key"`
 	Domain    string `yaml:"domain" mapstructure:"domain"`
 	Path      string `yaml:"path" mapstructure:"path"`
 	Secure    bool   `yaml:"secure" mapstructure:"secure"`
@@ -64,7 +67,7 @@ func DefaultConfig() *Config {
 			},
 		},
 		CustomPage: CustomPage{
-			Logo:        proxyPrefix + "/static/img/logo.svg",
+			Logo:        "/static/img/logo.svg",
 			TemplateDir: "",
 			FooterText:  "",
 		},
@@ -83,6 +86,12 @@ func DefaultConfig() *Config {
 
 // LoadConfig loads the configuration using viper
 func LoadConfig(configFile string) (*Config, error) {
+	// The order of precedence for configuration is:
+	// 1. Command line flags (bound via pflag in LoadConfig)
+	// 2. Environment variables (handled by viper with BAP_ prefix)
+	// 3. Configuration file (if provided)
+	// 4. Default values (set in DefaultConfig)
+
 	// Set default configuration
 	config := DefaultConfig()
 
@@ -101,26 +110,52 @@ func LoadConfig(configFile string) (*Config, error) {
 		v.AddConfigPath("/etc/basic-auth-proxy")
 	}
 
-	// Set environment variable prefix
-	v.SetEnvPrefix("BAP")
-	v.AutomaticEnv()
-
-	// Read config file
+	// Read config file FIRST  (lowest priority after defaults)
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			// Config file was found but another error occurred
 			return nil, fmt.Errorf("failed to read config file: %w", err)
 		}
 		// No config file found, will use defaults and env vars
+		logger.Info().Msg("No config file found, using defaults and env vars")
+	} else {
+		logger.Info().Str("file", v.ConfigFileUsed()).Msg("Loaded config file")
 	}
 
-	// Bind all configuration keys to environment variables
+	// Set environment variable prefix and bind (SECOND - higher priority than config file)
+	v.SetEnvPrefix("BAP")
+	v.AutomaticEnv()
 	bindEnvs(v, config)
+
+	logger.Debug().Bool("parsed", pflag.CommandLine.Parsed()).Msg("pflag command line parsed")
+
+	// Bind pflags LAST (highest priority - overrides everything)
+	if pflag.CommandLine.Parsed() {
+			logger.Debug().Msg("Binding command line flags")
+			v.BindPFlag("proxy.address", pflag.Lookup("address"))
+			v.BindPFlag("proxy.port", pflag.Lookup("port"))
+			v.BindPFlag("proxy.prefix", pflag.Lookup("proxy-prefix"))
+			v.BindPFlag("log_level", pflag.Lookup("log-level"))
+			v.BindPFlag("upstreams.0.url", pflag.Lookup("upstream"))
+			v.BindPFlag("cookie.name", pflag.Lookup("cookie-name"))
+			v.BindPFlag("cookie.secret_key", pflag.Lookup("cookie-secret"))
+			v.BindPFlag("cookie.block_key", pflag.Lookup("cookie-block"))
+			v.BindPFlag("custom_page.logo", pflag.Lookup("logo"))
+			v.BindPFlag("custom_page.template_dir", pflag.Lookup("template-dir"))
+			v.BindPFlag("custom_page.footer_text", pflag.Lookup("footer-text"))
+	}
 
 	// Unmarshal config into struct
 	if err := v.Unmarshal(config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
+
+	// Update logo if prefix changed and logo is still default
+	if config.CustomPage.Logo == "" || config.CustomPage.Logo == "/static/img/logo.svg" {
+		config.CustomPage.Logo = strings.TrimSuffix(config.Proxy.ProxyPrefix, "/") + "/static/img/logo.svg"
+	}
+
+	logger.Info().Msg("loaded configuration")
 
 	// Post-process configuration to handle URL parsing from environment variables
 	if err := processURLs(v, config); err != nil {
@@ -145,6 +180,7 @@ func bindEnvs(v *viper.Viper, config *Config) {
 
 	v.BindEnv("cookie.name", "BAP_COOKIE_NAME")
 	v.BindEnv("cookie.secret_key", "BAP_COOKIE_SECRET_KEY")
+	v.BindEnv("cookie.block_key", "BAP_COOKIE_BLOCK_KEY")
 	v.BindEnv("cookie.domain", "BAP_COOKIE_DOMAIN")
 	v.BindEnv("cookie.path", "BAP_COOKIE_PATH")
 	v.BindEnv("cookie.secure", "BAP_COOKIE_SECURE")

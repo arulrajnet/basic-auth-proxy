@@ -4,7 +4,6 @@ import (
 	"embed"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"runtime"
 	"strings"
@@ -16,7 +15,6 @@ import (
 	"github.com/arulrajnet/basic-auth-proxy/pkg/version"
 	"github.com/gorilla/mux"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 )
 
 //go:embed static/*
@@ -28,17 +26,20 @@ func main() {
 	// Define command line flags
 	configFile := pflag.StringP("config", "c", "", "path to the configuration file")
 	showVersion := pflag.BoolP("version", "v", false, "print version string")
-	logLevel := pflag.StringP("log-level", "l", "info", "set the log level (trace, debug, info, warn, error, fatal, panic)")
-	address := pflag.StringP("address", "a", "", "address to listen on")
-	port := pflag.IntP("port", "p", 0, "port to listen on")
-	proxyPrefix := pflag.StringP("proxy-prefix", "P", "", "prefix path for the proxy")
-	upstreamURL := pflag.StringP("upstream", "u", "", "upstream server URL")
-	cookieName := pflag.StringP("cookie-name", "s", "", "cookie name")
-	cookieSecret := pflag.StringP("cookie-secret", "S", "", "cookie secret key")
-	loginLogo := pflag.StringP("logo", "L", "", "Path or URL for the login page logo")
-	templateDir := pflag.StringP("template-dir", "T", "", "path to custom login template")
-	footerText := pflag.StringP("footer-text", "f", "", "footer text for the login page")
 	help := pflag.BoolP("help", "h", false, "show this help message")
+	logLevel := pflag.StringP("log-level", "l", "info", "set the log level (trace, debug, info, warn, error, fatal, panic)")
+
+	// Define other flags (viper will read these)
+	pflag.StringP("address", "a", "", "address to listen on")
+	pflag.IntP("port", "p", 0, "port to listen on")
+	pflag.StringP("proxy-prefix", "P", "", "prefix path for the proxy")
+	pflag.StringP("upstream", "u", "", "upstream server URL")
+	pflag.StringP("cookie-name", "s", "", "cookie name")
+	pflag.StringP("cookie-secret", "S", "", "cookie secret key")
+	pflag.StringP("cookie-block", "B", "", "cookie block key (encryption key, must be 32 bytes)")
+	pflag.StringP("logo", "L", "", "Path or URL for the login page logo")
+	pflag.StringP("template-dir", "T", "", "path to custom login template")
+	pflag.StringP("footer-text", "f", "", "footer text for the login page")
 
 	// Parse command line flags
 	pflag.Parse()
@@ -58,6 +59,11 @@ func main() {
 		os.Exit(0)
 	}
 
+	// Set log level from flag (this will be overridden by config if set there)
+	if *logLevel != "" {
+		log.SetLogLevel(*logLevel)
+	}
+
 	// Load configuration
 	cfg, err := proxy.LoadConfig(*configFile)
 	if err != nil {
@@ -65,61 +71,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Set log level
-	if *logLevel != "info" {
-		cfg.LogLevel = *logLevel
-		log.SetLogLevel(cfg.LogLevel)
-	}
-
-	// Override config with command line flags
-	viper.BindPFlag("proxy.address", pflag.Lookup("address"))
-	viper.BindPFlag("proxy.port", pflag.Lookup("port"))
-	viper.BindPFlag("proxy.prefix", pflag.Lookup("proxy-prefix"))
-	viper.BindPFlag("log_level", pflag.Lookup("log-level"))
-	viper.BindPFlag("upstreams.0.url", pflag.Lookup("upstream"))
-	viper.BindPFlag("upstreams.0.timeout", pflag.Lookup("upstream-timeout"))
-	viper.BindPFlag("cookie.name", pflag.Lookup("cookie-name"))
-	viper.BindPFlag("cookie.secret_key", pflag.Lookup("cookie-secret"))
-	viper.BindPFlag("custom_page.logo", pflag.Lookup("logo"))
-	viper.BindPFlag("custom_page.template_dir", pflag.Lookup("template-dir"))
-	viper.BindPFlag("custom_page.footer_text", pflag.Lookup("footer-text"))
-
-	// Apply overrides from flags
-	if *address != "" {
-		cfg.Proxy.Address = *address
-	}
-	if *port != 0 {
-		cfg.Proxy.Port = *port
-	}
-	if *proxyPrefix != "" {
-		cfg.Proxy.ProxyPrefix = *proxyPrefix
-	}
-	if *upstreamURL != "" && len(cfg.Upstreams) > 0 {
-		parsedURL, err := url.Parse(*upstreamURL)
-		if err != nil {
-			logger.Fatal().Err(err).Str("url", *upstreamURL).Msg("Failed to parse upstream URL")
-			os.Exit(1)
-		}
-		cfg.Upstreams[0].URL = parsedURL
-	}
-	if *cookieName != "" {
-		cfg.Cookie.Name = *cookieName
-	}
-	if *cookieSecret != "" {
-		cfg.Cookie.SecretKey = *cookieSecret
-	}
-	if *loginLogo != "" {
-		cfg.CustomPage.Logo = *loginLogo
-	}
-	if *templateDir != "" {
-		cfg.CustomPage.TemplateDir = *templateDir
-	}
-	if *footerText != "" {
-		cfg.CustomPage.FooterText = *footerText
-	}
+	// Set log level from config
+	log.SetLogLevel(cfg.LogLevel)
 
 	// Create session manager
-	sessionManager := session.NewSessionManager(cfg.Cookie.SecretKey)
+	sessionManager := session.NewSessionManager(cfg.Cookie.SecretKey, cfg.Cookie.BlockKey)
 
 	// Create proxy handler for auth routes (this is the same proxy instance used by middleware)
 	proxyHandler := proxy.NewProxy(cfg, sessionManager)
