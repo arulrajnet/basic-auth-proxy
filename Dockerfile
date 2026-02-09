@@ -50,6 +50,7 @@ ENV VERSION=${VERSION}
 
 WORKDIR /app
 COPY --from=base /app/build/basic-auth-proxy /usr/bin/basic-auth-proxy
+COPY config.yaml /app/config.yaml
 
 LABEL org.opencontainers.image.licenses=MIT \
       org.opencontainers.image.description="A Secure and Brandable Reverse Proxy for Upstream Services with Basic Auth." \

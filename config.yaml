@@ -19,7 +19,7 @@ cookie:
   same_site: "lax"
 
 custom_page:
-  logo: "https://via.placeholder.com/120x60?text=Logo"
+  logo: "/static/img/logo.svg"
   template_dir: "" # Leave empty to use the default template
   footer_text: ""
 

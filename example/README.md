@@ -63,14 +63,14 @@ You should see both services running:
 ```
 NAME                 COMMAND                  SERVICE         STATUS    PORTS
 example-nagios_legacy-1   "/usr/local/bin/star…"   nagios_legacy   running   0.0.0.0:32768->80/tcp
-example-proxy-1           "basic-auth-proxy --…"   proxy           running   0.0.0.0:80->80/tcp
+example-proxy-1           "basic-auth-proxy --…"   proxy           running   0.0.0.0:8080->8080/tcp
 ```
 
 ### 5. Access the Application
 
 Open your browser and navigate to:
 ```
-http://localhost/
+http://localhost:8080/
 ```
 
 You'll be redirected to a branded login page instead of seeing a browser Basic Auth popup.
@@ -85,7 +85,7 @@ After successful authentication, you'll be redirected to the Nagios dashboard an
 
 ## How It Works
 
-1. **Initial Request**: When you visit `http://localhost/`, the proxy detects you don't have a valid session
+1. **Initial Request**: When you visit `http://localhost:8080/`, the proxy detects you don't have a valid session
 2. **Login Redirect**: You're redirected to `/auth/login` where a branded login form is displayed
 3. **Authentication**: When you submit credentials, the proxy validates them against Nagios using Basic Auth
 4. **Session Creation**: On successful auth, a secure session cookie is set and you're redirected to your original destination
@@ -96,7 +96,7 @@ After successful authentication, you'll be redirected to the Nagios dashboard an
 The proxy is configured with the following settings (see `docker-compose.yaml`):
 
 - **Address**: `0.0.0.0` (listens on all interfaces)
-- **Port**: `80`
+- **Port**: `8080`
 - **Proxy Prefix**: `/auth/` (login/logout endpoints)
 - **Upstream**: `http://nagios_legacy:80/` (internal Docker network)
 - **Log Level**: `debug` (for development)
@@ -149,7 +149,7 @@ Try logging in with incorrect credentials to see the error handling.
 After logging in successfully, close your browser and reopen it. You should still be logged in until the session expires.
 
 ### Test Direct Access
-Try accessing `http://localhost/nagios/` directly - you should be redirected to the login page.
+Try accessing `http://localhost:8080/nagios/` directly - you should be redirected to the login page.
 
 ## Customization
 
@@ -157,15 +157,15 @@ You can customize the login page branding by modifying the templates in the `pkg
 
 ## Troubleshooting
 
-### Port 80 Already in Use
-If port 80 is already in use on your system, modify the `docker-compose.yaml` to use a different port:
+### Port 8080 Already in Use
+If port 8080 is already in use on your system, modify the `docker-compose.yaml` to use a different port:
 
 ```yaml
 ports:
-  - "8080:80"  # Use port 8080 instead
+  - "7080:8080"  # Use port 7080 instead
 ```
 
-Then access the application at `http://localhost:8080/`
+Then access the application at `http://localhost:7080/`
 
 ### Services Not Starting
 Check the logs for any error messages:
