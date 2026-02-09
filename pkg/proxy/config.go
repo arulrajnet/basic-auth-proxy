@@ -87,7 +87,7 @@ func DefaultConfig() *Config {
 // LoadConfig loads the configuration using viper
 func LoadConfig(configFile string) (*Config, error) {
 	// The order of precedence for configuration is:
-	// 1. Command line flags (handled in main.go)
+	// 1. Command line flags (bound via pflag in LoadConfig)
 	// 2. Environment variables (handled by viper with BAP_ prefix)
 	// 3. Configuration file (if provided)
 	// 4. Default values (set in DefaultConfig)
