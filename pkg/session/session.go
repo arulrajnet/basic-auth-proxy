@@ -1,6 +1,7 @@
 package session
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -38,7 +39,9 @@ func NewSessionManager(secretKey string) *SessionManager {
 		// Ensure hash key is at least 32 bytes
 		hashKey = securecookie.GenerateRandomKey(64)
 	}
-	blockKey := securecookie.GenerateRandomKey(32)
+	// Derive block key from secret key
+	hash := sha256.Sum256([]byte(secretKey + ":block"))
+	blockKey := hash[:32]  // Use first 32 bytes
 
 	store := sessions.NewCookieStore(hashKey, blockKey)
 	return &SessionManager{
