@@ -121,20 +121,16 @@ jobs:
               pull_number: ${{ inputs.pr_number }}
             });
             
-            // Get the latest review from each reviewer, excluding dismissed reviews
+            // Get the latest review from each reviewer (including dismissed reviews)
             const latestReviews = {};
             for (const review of reviews) {
               const reviewer = review.user.login;
-              // Skip dismissed reviews
-              if (review.state === 'DISMISSED') {
-                continue;
-              }
               if (!latestReviews[reviewer] || new Date(review.submitted_at) > new Date(latestReviews[reviewer].submitted_at)) {
                 latestReviews[reviewer] = review;
               }
             }
             
-            // Check if there's at least one approved review
+            // Check if there's at least one approved review (dismissed reviews won't have state APPROVED)
             const approvedReviews = Object.values(latestReviews).filter(review => review.state === 'APPROVED');
             const hasApproval = approvedReviews.length > 0;
             
@@ -204,7 +200,7 @@ jobs:
         if: steps.fork_check.outputs.skip == 'false'
         id: build_info
         run: |
-          VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "pr-${{ inputs.pr_number }}")
+          VERSION=$(git describe --tags --always 2>/dev/null || echo "pr-${{ inputs.pr_number }}")
           GIT_COMMIT=${{ steps.pr.outputs.head_sha }}
           BUILD_IMAGE_ID="${{ github.run_id }}-${{ github.run_number }}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
