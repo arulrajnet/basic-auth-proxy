@@ -24,7 +24,7 @@ type ProxyConfig struct {
 	Port          int    `yaml:"port" mapstructure:"port"`
 	Timeout       int    `yaml:"timeout" mapstructure:"timeout"` // Timeout in seconds
 	ProxyPrefix   string `yaml:"prefix" mapstructure:"prefix"`
-	TrustUpstream bool   `yaml:"trust_upstream" mapstructure:"trust_upstream"`
+	TrustUpstream bool   `yaml:"trust-upstream" mapstructure:"trust-upstream"`
 }
 
 // Upstream defines the structure for each upstream service.
