@@ -34,17 +34,34 @@ jobs:
             console.log('PR Details:');
             console.log(`  Title: ${pr.title}`);
             console.log(`  Author: ${pr.user.login}`);
-            console.log(`  Head Repo: ${pr.head.repo.full_name}`);
+            console.log(`  Head Repo: ${pr.head.repo ? pr.head.repo.full_name : 'deleted'}`);
             console.log(`  Base Repo: ${pr.base.repo.full_name}`);
             console.log(`  State: ${pr.state}`);
             console.log(`  Head SHA: ${pr.head.sha}`);
             
-            core.setOutput('is_fork', pr.head.repo.full_name !== pr.base.repo.full_name);
+            // Check if PR is from a fork (handle deleted repos)
+            const isFork = pr.head.repo && pr.head.repo.full_name !== pr.base.repo.full_name;
+            core.setOutput('is_fork', isFork);
             core.setOutput('head_sha', pr.head.sha);
             core.setOutput('head_ref', pr.head.ref);
-            core.setOutput('head_repo', pr.head.repo.full_name);
+            core.setOutput('head_repo', pr.head.repo ? pr.head.repo.full_name : 'deleted');
             core.setOutput('state', pr.state);
             core.setOutput('title', pr.title);
+
+      - name: Check PR state
+        id: state_check
+        run: |
+          if [ "${{ steps.pr.outputs.state }}" != "open" ]; then
+            echo "⚠️ **Warning: This PR is not open**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**PR State:** ${{ steps.pr.outputs.state }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Building Docker images for closed or merged PRs may waste resources." >> $GITHUB_STEP_SUMMARY
+            echo "Consider only building images for open PRs." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Stopping workflow to prevent unnecessary resource usage." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
 
       - name: Check if PR is from fork
         id: fork_check
@@ -104,10 +121,14 @@ jobs:
               pull_number: ${{ inputs.pr_number }}
             });
             
-            // Get the latest review from each reviewer
+            // Get the latest review from each reviewer, excluding dismissed reviews
             const latestReviews = {};
             for (const review of reviews) {
               const reviewer = review.user.login;
+              // Skip dismissed reviews
+              if (review.state === 'DISMISSED') {
+                continue;
+              }
               if (!latestReviews[reviewer] || new Date(review.submitted_at) > new Date(latestReviews[reviewer].submitted_at)) {
                 latestReviews[reviewer] = review;
               }
