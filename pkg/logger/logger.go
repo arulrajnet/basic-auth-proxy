@@ -1,3 +1,4 @@
+// Package logger provides a centralized logging utility.
 package logger
 
 import (

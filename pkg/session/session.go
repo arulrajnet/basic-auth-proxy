@@ -1,3 +1,4 @@
+// Package session provides session management using gorilla sessions.
 package session
 
 import (
@@ -15,7 +16,8 @@ import (
 
 var logger = log.GetLogger()
 
-type SessionManager struct {
+// SessionManager handles session storage and retrieval.
+type SessionManager struct { //nolint:revive
 	store        *sessions.CookieStore
 	cookieName   string
 	cookiePath   string
@@ -26,12 +28,14 @@ type SessionManager struct {
 	sameSite     http.SameSite
 }
 
+// UserInfo contains authenticated user data.
 type UserInfo struct {
 	Username string    `json:"username"`
 	Password string    `json:"password"`
 	LoggedIn time.Time `json:"logged_in"`
 }
 
+// NewSessionManager creates a new session manager with the given keys.
 func NewSessionManager(secretKey, blockKey string) *SessionManager {
 	// Create hash key (for signing)
 	hashKey := []byte(secretKey)
@@ -106,15 +110,18 @@ func (m *SessionManager) ConfigureCookie(name, path, domain string, maxAge int, 
 	}
 }
 
+// Get retrieves a session from the store.
 func (m *SessionManager) Get(r *http.Request, name string) (*sessions.Session, error) {
 	return m.store.Get(r, name)
 }
 
+// GenerateBasicAuth generates a Basic Auth header from username and password.
 func (m *SessionManager) GenerateBasicAuth(username, password string) string {
 	auth := username + ":" + password
 	return "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
 }
 
+// CreateUserSession creates a new session for the user.
 func (m *SessionManager) CreateUserSession(w http.ResponseWriter, r *http.Request, sessionName, username, password string) error {
 	// Get session
 	session, err := m.Get(r, sessionName)
@@ -132,6 +139,7 @@ func (m *SessionManager) CreateUserSession(w http.ResponseWriter, r *http.Reques
 	return session.Save(r, w)
 }
 
+// GetUserInfo retrieves UserInfo from the session.
 func (m *SessionManager) GetUserInfo(r *http.Request, sessionName string) (*UserInfo, error) {
 	session, err := m.Get(r, sessionName)
 	if err != nil {
@@ -174,6 +182,7 @@ func (m *SessionManager) GetUserInfo(r *http.Request, sessionName string) (*User
 	}, nil
 }
 
+// Destroy destroys the session.
 func (m *SessionManager) Destroy(w http.ResponseWriter, r *http.Request, name string) error {
 	session, err := m.Get(r, name)
 	if err != nil {

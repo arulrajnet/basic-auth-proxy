@@ -12,7 +12,7 @@ import (
 
 func TestProxyTrustedIPs(t *testing.T) {
 	// 1. Mock Backend
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer backend.Close()

@@ -1,3 +1,4 @@
+// Package main is the entry point for the basic-auth-proxy.
 package main
 
 import (
@@ -6,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"runtime"
-	"strings"
 	"time"
 
 	log "github.com/arulrajnet/basic-auth-proxy/pkg/logger"
@@ -87,12 +87,6 @@ func main() {
 	r.Use(proxy.RequestLogger(logger))
 
 	// Add auth routes
-	authPrefix := cfg.Proxy.ProxyPrefix
-	if authPrefix == "" {
-		authPrefix = "/auth"
-	}
-	authPrefix = strings.TrimSuffix(authPrefix, "/")
-
 	// Auth routes (these bypass session middleware check)
 	// r.PathPrefix(authPrefix + "/").Handler(proxyHandler)
 	r.PathPrefix("/").Handler(proxyHandler)

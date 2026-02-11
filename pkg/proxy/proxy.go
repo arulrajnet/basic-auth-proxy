@@ -1,3 +1,4 @@
+// Package proxy implements the basic auth proxy logic.
 package proxy
 
 import (
@@ -20,6 +21,11 @@ import (
 
 var logger = log.GetLogger()
 
+const (
+	loginPath = "/login"
+)
+
+// Proxy represents the basic auth proxy.
 type Proxy struct {
 	config         *Config
 	sessionManager *session.SessionManager
@@ -29,6 +35,7 @@ type Proxy struct {
 	trustedCIDRs   []*net.IPNet
 }
 
+// NewProxy creates a new Proxy instance.
 func NewProxy(config *Config, sessionManager *session.SessionManager) *Proxy {
 	// Configure session manager with cookie settings
 	sessionManager.ConfigureCookie(
@@ -37,7 +44,7 @@ func NewProxy(config *Config, sessionManager *session.SessionManager) *Proxy {
 		config.Cookie.Domain,
 		config.Cookie.MaxAge,
 		config.Cookie.Secure,
-		config.Cookie.HttpOnly,
+		config.Cookie.HTTPOnly,
 		config.Cookie.SameSite,
 	)
 
@@ -145,70 +152,58 @@ func (p *Proxy) SetStaticFiles(staticFiles embed.FS) {
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Check if the request is for an auth endpoint
 	path := r.URL.Path
+	prefix := ""
 	if p.proxyPrefix != "" && p.proxyPrefix != "/" {
-		// If there's a proxy prefix, check if the request is for a prefixed auth endpoint
-		if path == p.proxyPrefix+"/sign_in" || path == p.proxyPrefix+"/login" {
-			p.handleSignIn(w, r)
-			return
-		} else if path == p.proxyPrefix+"/sign_out" || path == p.proxyPrefix+"/logout" {
-			p.handleSignOut(w, r)
-			return
-		} else if path == p.proxyPrefix+"/user_info" {
-			p.handleUserInfo(w, r)
-			return
-		} else if strings.HasPrefix(path, p.proxyPrefix+"/static/") {
-			p.handleStaticFiles(w, r)
-			return
-		}
-	} else {
-		// No proxy prefix, check regular auth endpoints
-		if path == "/sign_in" || path == "/login" {
-			p.handleSignIn(w, r)
-			return
-		} else if path == "/sign_out" || path == "/logout" {
-			p.handleSignOut(w, r)
-			return
-		} else if path == "/user_info" {
-			p.handleUserInfo(w, r)
-			return
-		} else if strings.HasPrefix(path, "/static/") {
-			p.handleStaticFiles(w, r)
-			return
-		}
+		prefix = p.proxyPrefix
+	}
+
+	switch {
+	case path == prefix+"/sign_in" || path == prefix+loginPath:
+		p.handleSignIn(w, r)
+		return
+	case path == prefix+"/sign_out" || path == prefix+"/logout":
+		p.handleSignOut(w, r)
+		return
+	case path == prefix+"/user_info":
+		p.handleUserInfo(w, r)
+		return
+	case strings.HasPrefix(path, prefix+"/static/"):
+		p.handleStaticFiles(w, r)
+		return
 	}
 
 	// Build login path with redirect parameter
-	loginPath := "/login"
-	if p.proxyPrefix != "" && p.proxyPrefix != "/" {
-		loginPath = p.proxyPrefix + "/login"
+	fullLoginPath := loginPath
+	if prefix != "" {
+		fullLoginPath = prefix + loginPath
 	}
 
 	// Add current path as redirect parameter
 	redirectPath := r.URL.RequestURI()
-	if redirectPath != loginPath && !strings.Contains(redirectPath, "/login") {
+	if redirectPath != fullLoginPath && !strings.Contains(redirectPath, loginPath) {
 		q := url.Values{}
 		q.Add("redirect", redirectPath)
-		loginPath = fmt.Sprintf("%s?%s", loginPath, q.Encode())
+		fullLoginPath = fmt.Sprintf("%s?%s", fullLoginPath, q.Encode())
 	}
 
 	// For all other requests, check authentication and proxy to upstream
 	session, err := p.sessionManager.Get(r, p.config.Cookie.Name)
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to get session")
-		http.Redirect(w, r, loginPath, http.StatusFound)
+		http.Redirect(w, r, fullLoginPath, http.StatusFound)
 		return
 	}
 
 	// Check if session exists
 	if session == nil {
-		http.Redirect(w, r, loginPath, http.StatusFound)
+		http.Redirect(w, r, fullLoginPath, http.StatusFound)
 		return
 	}
 
 	// Check if user is authenticated
 	if auth, ok := session.Values["authenticated"].(bool); !ok || !auth {
 		logger.Info().Str("path", r.URL.Path).Msg("Unauthenticated request")
-		http.Redirect(w, r, loginPath, http.StatusFound)
+		http.Redirect(w, r, fullLoginPath, http.StatusFound)
 		return
 	}
 
@@ -263,7 +258,8 @@ func (p *Proxy) handleSignIn(w http.ResponseWriter, r *http.Request) {
 		}
 
 		upstream := p.config.Upstreams[0] // Using first upstream
-		if validated, err := p.validateCredentials(upstream, username, password); err != nil {
+		validated, err := p.validateCredentials(upstream, username, password)
+		if err != nil {
 			logger.Error().Err(err).Msg("Error validating credentials")
 			p.serveLoginPage(w, r, "Authentication service temporarily unavailable. Please try again later.")
 			return
@@ -297,9 +293,9 @@ func (p *Proxy) handleSignIn(w http.ResponseWriter, r *http.Request) {
 // Handle sign-out requests
 func (p *Proxy) handleSignOut(w http.ResponseWriter, r *http.Request) {
 	// Redirect to login page
-	loginPath := "/login"
+	fullLoginPath := loginPath
 	if p.proxyPrefix != "" && p.proxyPrefix != "/" {
-		loginPath = p.proxyPrefix + "/login"
+		fullLoginPath = p.proxyPrefix + loginPath
 	}
 	// Destroy the session
 	err := p.sessionManager.Destroy(w, r, p.config.Cookie.Name)
@@ -314,14 +310,14 @@ func (p *Proxy) handleSignOut(w http.ResponseWriter, r *http.Request) {
 			MaxAge:   -1,
 			Expires:  time.Now().Add(-1 * time.Hour),
 			Secure:   p.config.Cookie.Secure,
-			HttpOnly: p.config.Cookie.HttpOnly,
+			HttpOnly: p.config.Cookie.HTTPOnly,
 		}
 		http.SetCookie(w, cookie)
-		http.Redirect(w, r, loginPath, http.StatusFound)
+		http.Redirect(w, r, fullLoginPath, http.StatusFound)
 		return
 	}
 
-	http.Redirect(w, r, loginPath, http.StatusFound)
+	http.Redirect(w, r, fullLoginPath, http.StatusFound)
 }
 
 // Handle user_info requests
@@ -337,7 +333,7 @@ func (p *Proxy) handleUserInfo(w http.ResponseWriter, r *http.Request) {
 	// Return user info as JSON
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(userInfoJSON)
+	_, _ = w.Write(userInfoJSON)
 }
 
 // Serve the login page
@@ -498,7 +494,7 @@ func (p *Proxy) validateCredentials(upstream Upstream, username, password string
 	if err != nil {
 		return false, fmt.Errorf("failed to send request to upstream: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check response status code
 	return resp.StatusCode == http.StatusOK, nil
