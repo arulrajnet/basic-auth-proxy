@@ -224,7 +224,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Handle sign-in requests (both GET for form and POST for credentials)
 func (p *Proxy) handleSignIn(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodGet {
+	switch r.Method {
+	case http.MethodGet:
 		// Check if user is already authenticated
 		if userInfo, err := p.sessionManager.GetUserInfo(r, p.config.Cookie.Name); err == nil && userInfo != nil {
 			// User is already logged in, redirect to root
@@ -236,7 +237,7 @@ func (p *Proxy) handleSignIn(w http.ResponseWriter, r *http.Request) {
 		// Serve the login page
 		p.serveLoginPage(w, r)
 		return
-	} else if r.Method == http.MethodPost {
+	case http.MethodPost:
 		// Process login form
 		err := r.ParseForm()
 		if err != nil {
@@ -288,7 +289,7 @@ func (p *Proxy) handleSignIn(w http.ResponseWriter, r *http.Request) {
 		}
 
 		http.Redirect(w, r, redirectPath, http.StatusFound)
-	} else {
+	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
 }

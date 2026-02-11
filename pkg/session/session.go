@@ -74,7 +74,7 @@ func NewSessionManager(secretKey, blockKey string) *SessionManager {
 func (m *SessionManager) ConfigureCookie(name, path, domain string, maxAge int, secure, httpOnly bool, sameSite string) {
 	m.cookieName = name
 	m.cookiePath = path
-	if domain != "localhost" || domain != "127.0.0.1" {
+	if domain != "localhost" && domain != "127.0.0.1" {
 		m.cookieDomain = domain
 	} else {
 		m.cookieDomain = ""
