@@ -1,0 +1,125 @@
+name: CI - Test & Lint
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'main.go'
+      - 'pkg/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.golangci.yaml'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'main.go'
+      - 'pkg/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.golangci.yaml'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test -v -race -count=1 ./...
+
+      - name: Run tests with coverage
+        run: |
+          go test -coverprofile=coverage.out -covermode=atomic ./...
+          go tool cover -func=coverage.out
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+          retention-days: 7
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
+  vet:
+    name: Vet
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run go vet
+        run: go vet ./...
+
+  summary:
+    name: CI Summary
+    needs: [test, lint, vet]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Create CI summary
+        run: |
+          echo "## 🧪 CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.test.result }}" = "success" ]; then
+            echo "- ✅ **Tests**: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ **Tests**: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.lint.result }}" = "success" ]; then
+            echo "- ✅ **Lint**: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ **Lint**: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.vet.result }}" = "success" ]; then
+            echo "- ✅ **Vet**: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ **Vet**: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
