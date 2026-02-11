@@ -1,56 +1,64 @@
 version: "2"
-
 run:
-  timeout: 5m
   tests: true
-
 linters:
-  disable-all: true
+  default: none
   enable:
+    - bodyclose
+    - copyloopvar
+    - dogsled
+    - errcheck
+    - goconst
+    - gocritic
+    - goprintffuncname
+    - gosec
     - govet
     - ineffassign
-    - goconst
-    - gosec
-    - staticcheck
-    - unused
-    - bodyclose
-    - dogsled
-    - goprintffuncname
     - misspell
     - prealloc
-    - copyloopvar
-    - unconvert
-    - gocritic
     - revive
-    - errcheck
-
-linters-settings:
-  govet:
-    enable:
-      - shadow
-  revive:
+    - staticcheck
+    - unconvert
+    - unused
+  settings:
+    govet:
+      enable:
+        - shadow
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - disableStutteringCheck
+        - name: package-comments
+          disabled: true
+        - name: unused-parameter
+          disabled: true
+        - name: var-naming
+          disabled: true
+  exclusions:
+    generated: lax
     rules:
-      - name: exported
-        arguments:
-          - disableStutteringCheck
-      - name: package-comments
-        disabled: true
-      - name: unused-parameter
-        disabled: true
-      - name: var-naming
-        disabled: true
-
-issues:
-  exclude-use-default: false
-  exclude:
-    - "G104: Errors unhandled"
-  exclude-rules:
-    - text: "stutters"
-    - path: _test\.go
-      linters:
-        - revive
-        - bodyclose
-        - unconvert
-        - gocritic
-        - gosec
-        - goconst
+      - text: stutters
+        linters:
+          - revive
+      - linters:
+          - bodyclose
+          - goconst
+          - gocritic
+          - gosec
+          - revive
+          - unconvert
+        path: _test\.go
+      - path: (.+)\.go$
+        text: 'G104: Errors unhandled'
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
