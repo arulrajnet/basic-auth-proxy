@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -9,11 +10,9 @@ import (
 	"github.com/arulrajnet/basic-auth-proxy/pkg/session"
 )
 
-func TestProxyTrustUpstream(t *testing.T) {
+func TestProxyTrustedIPs(t *testing.T) {
 	// 1. Mock Backend
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Received-Forwarded-For", r.Header.Get("X-Forwarded-For"))
-		w.Header().Set("X-Received-Real-IP", r.Header.Get("X-Real-IP"))
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer backend.Close()
@@ -22,39 +21,53 @@ func TestProxyTrustUpstream(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		trustUpstream  bool
+		trustedIPs     []string
 		clientIP       string
 		xffIncoming    string
 		realIPIncoming string
 		protoIncoming  string
 		portIncoming   string
-		expectRealIP   string
-		expectProto    string
-		expectPort     string
+		shouldTrust    bool
 	}{
 		{
 			name:           "Untrusted (Default): Should overwrite X-Real-IP and sanitize XFF/Proto/Port",
-			trustUpstream:  false,
+			trustedIPs:     []string{},
 			clientIP:       "1.2.3.4:12345",
 			xffIncoming:    "100.100.100.100",
 			realIPIncoming: "100.100.100.100",
 			protoIncoming:  "https",
 			portIncoming:   "443",
-			expectRealIP:   "1.2.3.4:12345", // overwritten to RemoteAddr
-			expectProto:    "",              // Deleted
-			expectPort:     "",              // Deleted
+			shouldTrust:    false,
 		},
 		{
-			name:           "Trusted: Should preserve XFF and X-Real-IP and Proto/Port",
-			trustUpstream:  true,
+			name:           "Trusted IP: Should preserve headers",
+			trustedIPs:     []string{"1.2.3.4/32"},
 			clientIP:       "1.2.3.4:12345",
 			xffIncoming:    "100.100.100.100",
 			realIPIncoming: "100.100.100.100",
 			protoIncoming:  "https",
 			portIncoming:   "443",
-			expectRealIP:   "100.100.100.100",
-			expectProto:    "https",
-			expectPort:     "443",
+			shouldTrust:    true,
+		},
+		{
+			name:           "Trusted CIDR: Should preserve headers",
+			trustedIPs:     []string{"1.2.3.0/24"},
+			clientIP:       "1.2.3.4:5678",
+			xffIncoming:    "100.100.100.100",
+			realIPIncoming: "100.100.100.100",
+			protoIncoming:  "https",
+			portIncoming:   "443",
+			shouldTrust:    true,
+		},
+		{
+			name:           "Untrusted IP in CIDR range mismatch",
+			trustedIPs:     []string{"10.0.0.0/8"},
+			clientIP:       "1.2.3.4:12345",
+			xffIncoming:    "100.100.100.100",
+			realIPIncoming: "100.100.100.100",
+			protoIncoming:  "https",
+			portIncoming:   "443",
+			shouldTrust:    false,
 		},
 	}
 
@@ -63,8 +76,8 @@ func TestProxyTrustUpstream(t *testing.T) {
 			// Config
 			cfg := &Config{
 				Proxy: ProxyConfig{
-					TrustUpstream: tt.trustUpstream,
-					ProxyPrefix:   "/",
+					TrustedIPs:  tt.trustedIPs,
+					ProxyPrefix: "/",
 				},
 				Upstreams: []Upstream{{URL: backendURL}},
 				Cookie: CookieConfig{
@@ -76,6 +89,9 @@ func TestProxyTrustUpstream(t *testing.T) {
 			sm := session.NewSessionManager("12345678901234567890123456789012", "12345678901234567890123456789012") // 32 bytes
 
 			// Create Proxy
+			// Need to initialize session manager first
+			sm.ConfigureCookie("test_cookie", "/", "", 3600, false, true, "lax")
+
 			p := NewProxy(cfg, sm)
 
 			// Setup request
@@ -101,7 +117,7 @@ func TestProxyTrustUpstream(t *testing.T) {
 			gotPort := req.Header.Get("X-Forwarded-Port")
 
 			// Verification
-			if tt.trustUpstream {
+			if tt.shouldTrust {
 				// Trusted: preserved
 				if gotXFF != tt.xffIncoming {
 					t.Errorf("Trusted: expected XFF %q, got %q", tt.xffIncoming, gotXFF)
@@ -120,14 +136,21 @@ func TestProxyTrustUpstream(t *testing.T) {
 				if gotXFF != "" {
 					t.Errorf("Untrusted: expected empty XFF (deleted), got %q", gotXFF)
 				}
-				if gotRealIP != tt.clientIP {
-					t.Errorf("Untrusted: expected RealIP %q, got %q", tt.clientIP, gotRealIP)
+
+				// Expected Real IP should be Client IP without port
+				clientIPNoPort := tt.clientIP
+				if host, _, err := net.SplitHostPort(tt.clientIP); err == nil {
+					clientIPNoPort = host
 				}
-				if gotProto != tt.expectProto {
-					t.Errorf("Untrusted: expected Proto %q, got %q", tt.expectProto, gotProto)
+
+				if gotRealIP != clientIPNoPort {
+					t.Errorf("Untrusted: expected RealIP %q, got %q", clientIPNoPort, gotRealIP)
 				}
-				if gotPort != tt.expectPort {
-					t.Errorf("Untrusted: expected Port %q, got %q", tt.expectPort, gotPort)
+				if gotProto != "" {
+					t.Errorf("Untrusted: expected empty Proto, got %q", gotProto)
+				}
+				if gotPort != "" {
+					t.Errorf("Untrusted: expected empty Port, got %q", gotPort)
 				}
 			}
 		})

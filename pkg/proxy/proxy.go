@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -25,6 +26,7 @@ type Proxy struct {
 	reverseProxy   *httputil.ReverseProxy
 	proxyPrefix    string
 	staticFiles    embed.FS
+	trustedCIDRs   []*net.IPNet
 }
 
 func NewProxy(config *Config, sessionManager *session.SessionManager) *Proxy {
@@ -44,6 +46,16 @@ func NewProxy(config *Config, sessionManager *session.SessionManager) *Proxy {
 		config:         config,
 		sessionManager: sessionManager,
 		proxyPrefix:    strings.TrimSuffix(config.Proxy.ProxyPrefix, "/"),
+	}
+
+	// Parse trusted CIDRs
+	for _, cidr := range config.Proxy.TrustedIPs {
+		_, ipNet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			logger.Error().Err(err).Str("cidr", cidr).Msg("Invalid trusted IP CIDR, ignoring")
+			continue
+		}
+		p.trustedCIDRs = append(p.trustedCIDRs, ipNet)
 	}
 
 	// Setup reverse proxy to the first upstream
@@ -73,14 +85,30 @@ func NewProxy(config *Config, sessionManager *session.SessionManager) *Proxy {
 				}
 
 				// Handle proxy headers based on trust configuration
-				if !config.Proxy.TrustUpstream {
+				clientIP, _, err := net.SplitHostPort(req.RemoteAddr)
+				if err != nil {
+					clientIP = req.RemoteAddr
+				}
+
+				isTrusted := false
+				clientIPParsed := net.ParseIP(clientIP)
+				if clientIPParsed != nil {
+					for _, cidr := range p.trustedCIDRs {
+						if cidr.Contains(clientIPParsed) {
+							isTrusted = true
+							break
+						}
+					}
+				}
+
+				if !isTrusted {
 					// We are the edge proxy (or untrusted upstream). Do not trust incoming headers.
 					// Remove X-Forwarded-For to prevent spoofing
 					req.Header.Del("X-Forwarded-For")
 					req.Header.Del("X-Forwarded-Proto")
 					req.Header.Del("X-Forwarded-Port")
 					// Set Real-IP to the immediate caller
-					req.Header.Set("X-Real-IP", req.RemoteAddr)
+					req.Header.Set("X-Real-IP", clientIP)
 				}
 
 				// Set proxy prefix if needed

@@ -20,11 +20,11 @@ type Config struct {
 }
 
 type ProxyConfig struct {
-	Address       string `yaml:"address" mapstructure:"address"`
-	Port          int    `yaml:"port" mapstructure:"port"`
-	Timeout       int    `yaml:"timeout" mapstructure:"timeout"` // Timeout in seconds
-	ProxyPrefix   string `yaml:"prefix" mapstructure:"prefix"`
-	TrustUpstream bool   `yaml:"trust_upstream" mapstructure:"trust_upstream"`
+	Address     string   `yaml:"address" mapstructure:"address"`
+	Port        int      `yaml:"port" mapstructure:"port"`
+	Timeout     int      `yaml:"timeout" mapstructure:"timeout"` // Timeout in seconds
+	ProxyPrefix string   `yaml:"prefix" mapstructure:"prefix"`
+	TrustedIPs  []string `yaml:"trusted_ips" mapstructure:"trusted_ips"`
 }
 
 // Upstream defines the structure for each upstream service.
@@ -57,11 +57,11 @@ func DefaultConfig() *Config {
 	proxyPrefix := "/auth" // Default proxy prefix
 	return &Config{
 		Proxy: ProxyConfig{
-			Address:       "0.0.0.0",
-			Port:          8080,
-			Timeout:       30,
-			ProxyPrefix:   proxyPrefix,
-			TrustUpstream: false,
+			Address:     "0.0.0.0",
+			Port:        8080,
+			Timeout:     30,
+			ProxyPrefix: proxyPrefix,
+			TrustedIPs:  []string{},
 		},
 		Upstreams: []Upstream{
 			{
@@ -137,7 +137,7 @@ func LoadConfig(configFile string) (*Config, error) {
 		v.BindPFlag("proxy.address", pflag.Lookup("address"))
 		v.BindPFlag("proxy.port", pflag.Lookup("port"))
 		v.BindPFlag("proxy.prefix", pflag.Lookup("proxy-prefix"))
-		v.BindPFlag("proxy.trust_upstream", pflag.Lookup("trust-upstream"))
+		v.BindPFlag("proxy.trusted_ips", pflag.Lookup("trusted-ips"))
 		v.BindPFlag("log_level", pflag.Lookup("log-level"))
 		v.BindPFlag("upstreams.0.url", pflag.Lookup("upstream"))
 		v.BindPFlag("cookie.name", pflag.Lookup("cookie-name"))
@@ -174,7 +174,7 @@ func bindEnvs(v *viper.Viper, config *Config) {
 	v.BindEnv("proxy.port", "BAP_PROXY_PORT")
 	v.BindEnv("proxy.timeout", "BAP_PROXY_TIMEOUT")
 	v.BindEnv("proxy.prefix", "BAP_PROXY_PREFIX")
-	v.BindEnv("proxy.trust_upstream", "BAP_PROXY_TRUST_UPSTREAM")
+	v.BindEnv("proxy.trusted_ips", "BAP_PROXY_TRUSTED_IPS")
 
 	v.BindEnv("custom_page.logo", "BAP_CUSTOM_PAGE_LOGO")
 	v.BindEnv("custom_page.template_dir", "BAP_CUSTOM_PAGE_TEMPLATE_DIR")
