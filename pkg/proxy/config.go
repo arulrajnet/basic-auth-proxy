@@ -19,26 +19,30 @@ type Config struct {
 	Cookie     CookieConfig `yaml:"cookie" mapstructure:"cookie"`
 }
 
-type ProxyConfig struct {
-	Address     string `yaml:"address" mapstructure:"address"`
-	Port        int    `yaml:"port" mapstructure:"port"`
-	Timeout     int    `yaml:"timeout" mapstructure:"timeout"` // Timeout in seconds
-	ProxyPrefix string `yaml:"prefix" mapstructure:"prefix"`
+// ProxyConfig holds the configuration for the proxy server.
+type ProxyConfig struct { //nolint:revive
+	Address     string   `yaml:"address" mapstructure:"address"`
+	Port        int      `yaml:"port" mapstructure:"port"`
+	Timeout     int      `yaml:"timeout" mapstructure:"timeout"` // Timeout in seconds
+	ProxyPrefix string   `yaml:"prefix" mapstructure:"prefix"`
+	TrustedIPs  []string `yaml:"trusted_ips" mapstructure:"trusted_ips"`
 }
 
 // Upstream defines the structure for each upstream service.
 type Upstream struct {
-	URL     *url.URL `yaml:"-" mapstructure:"-"`                        // Parsed URL (not directly unmarshaled)
-	URLStr  string   `yaml:"url" mapstructure:"url"`                    // Raw URL string for unmarshaling
-	Timeout int      `yaml:"timeout" mapstructure:"timeout"`            // Timeout in seconds
+	URL     *url.URL `yaml:"-" mapstructure:"-"`             // Parsed URL (not directly unmarshaled)
+	URLStr  string   `yaml:"url" mapstructure:"url"`         // Raw URL string for unmarshaling
+	Timeout int      `yaml:"timeout" mapstructure:"timeout"` // Timeout in seconds
 }
 
+// CustomPage holds the configuration for custom login pages.
 type CustomPage struct {
 	Logo        string `yaml:"logo" mapstructure:"logo"`
 	TemplateDir string `yaml:"template_dir" mapstructure:"template_dir"`
 	FooterText  string `yaml:"footer_text" mapstructure:"footer_text"`
 }
 
+// CookieConfig holds the configuration for sessions and cookies.
 type CookieConfig struct {
 	Name      string `yaml:"name" mapstructure:"name"`
 	SecretKey string `yaml:"secret_key" mapstructure:"secret_key"`
@@ -46,7 +50,7 @@ type CookieConfig struct {
 	Domain    string `yaml:"domain" mapstructure:"domain"`
 	Path      string `yaml:"path" mapstructure:"path"`
 	Secure    bool   `yaml:"secure" mapstructure:"secure"`
-	HttpOnly  bool   `yaml:"http_only" mapstructure:"http_only"`
+	HTTPOnly  bool   `yaml:"http_only" mapstructure:"http_only"`
 	MaxAge    int    `yaml:"max_age" mapstructure:"max_age"`
 	SameSite  string `yaml:"same_site" mapstructure:"same_site"`
 }
@@ -60,6 +64,7 @@ func DefaultConfig() *Config {
 			Port:        8080,
 			Timeout:     30,
 			ProxyPrefix: proxyPrefix,
+			TrustedIPs:  []string{},
 		},
 		Upstreams: []Upstream{
 			{
@@ -77,7 +82,7 @@ func DefaultConfig() *Config {
 			Domain:   "",
 			Path:     "/",
 			Secure:   false,
-			HttpOnly: true,
+			HTTPOnly: true,
 			MaxAge:   86400,
 			SameSite: "lax",
 		},
@@ -131,18 +136,19 @@ func LoadConfig(configFile string) (*Config, error) {
 
 	// Bind pflags LAST (highest priority - overrides everything)
 	if pflag.CommandLine.Parsed() {
-			logger.Debug().Msg("Binding command line flags")
-			v.BindPFlag("proxy.address", pflag.Lookup("address"))
-			v.BindPFlag("proxy.port", pflag.Lookup("port"))
-			v.BindPFlag("proxy.prefix", pflag.Lookup("proxy-prefix"))
-			v.BindPFlag("log_level", pflag.Lookup("log-level"))
-			v.BindPFlag("upstreams.0.url", pflag.Lookup("upstream"))
-			v.BindPFlag("cookie.name", pflag.Lookup("cookie-name"))
-			v.BindPFlag("cookie.secret_key", pflag.Lookup("cookie-secret"))
-			v.BindPFlag("cookie.block_key", pflag.Lookup("cookie-block"))
-			v.BindPFlag("custom_page.logo", pflag.Lookup("logo"))
-			v.BindPFlag("custom_page.template_dir", pflag.Lookup("template-dir"))
-			v.BindPFlag("custom_page.footer_text", pflag.Lookup("footer-text"))
+		logger.Debug().Msg("Binding command line flags")
+		_ = v.BindPFlag("proxy.address", pflag.Lookup("address"))
+		_ = v.BindPFlag("proxy.port", pflag.Lookup("port"))
+		_ = v.BindPFlag("proxy.prefix", pflag.Lookup("proxy-prefix"))
+		_ = v.BindPFlag("proxy.trusted_ips", pflag.Lookup("trusted-ips"))
+		_ = v.BindPFlag("log_level", pflag.Lookup("log-level"))
+		_ = v.BindPFlag("upstreams.0.url", pflag.Lookup("upstream"))
+		_ = v.BindPFlag("cookie.name", pflag.Lookup("cookie-name"))
+		_ = v.BindPFlag("cookie.secret_key", pflag.Lookup("cookie-secret"))
+		_ = v.BindPFlag("cookie.block_key", pflag.Lookup("cookie-block"))
+		_ = v.BindPFlag("custom_page.logo", pflag.Lookup("logo"))
+		_ = v.BindPFlag("custom_page.template_dir", pflag.Lookup("template-dir"))
+		_ = v.BindPFlag("custom_page.footer_text", pflag.Lookup("footer-text"))
 	}
 
 	// Unmarshal config into struct
@@ -166,31 +172,32 @@ func LoadConfig(configFile string) (*Config, error) {
 }
 
 // bindEnvs recursively binds all nested config struct fields to environment variables
-func bindEnvs(v *viper.Viper, config *Config) {
-	v.BindEnv("proxy.address", "BAP_PROXY_ADDRESS")
-	v.BindEnv("proxy.port", "BAP_PROXY_PORT")
-	v.BindEnv("proxy.timeout", "BAP_PROXY_TIMEOUT")
-	v.BindEnv("proxy.prefix", "BAP_PROXY_PREFIX")
+func bindEnvs(v *viper.Viper, _ *Config) {
+	_ = v.BindEnv("proxy.address", "BAP_PROXY_ADDRESS")
+	_ = v.BindEnv("proxy.port", "BAP_PROXY_PORT")
+	_ = v.BindEnv("proxy.timeout", "BAP_PROXY_TIMEOUT")
+	_ = v.BindEnv("proxy.prefix", "BAP_PROXY_PREFIX")
+	_ = v.BindEnv("proxy.trusted_ips", "BAP_PROXY_TRUSTED_IPS")
 
-	v.BindEnv("custom_page.logo", "BAP_CUSTOM_PAGE_LOGO")
-	v.BindEnv("custom_page.template_dir", "BAP_CUSTOM_PAGE_TEMPLATE_DIR")
-	v.BindEnv("custom_page.footer_text", "BAP_CUSTOM_PAGE_FOOTER_TEXT")
+	_ = v.BindEnv("custom_page.logo", "BAP_CUSTOM_PAGE_LOGO")
+	_ = v.BindEnv("custom_page.template_dir", "BAP_CUSTOM_PAGE_TEMPLATE_DIR")
+	_ = v.BindEnv("custom_page.footer_text", "BAP_CUSTOM_PAGE_FOOTER_TEXT")
 
-	v.BindEnv("log_level", "BAP_LOG_LEVEL")
+	_ = v.BindEnv("log_level", "BAP_LOG_LEVEL")
 
-	v.BindEnv("cookie.name", "BAP_COOKIE_NAME")
-	v.BindEnv("cookie.secret_key", "BAP_COOKIE_SECRET_KEY")
-	v.BindEnv("cookie.block_key", "BAP_COOKIE_BLOCK_KEY")
-	v.BindEnv("cookie.domain", "BAP_COOKIE_DOMAIN")
-	v.BindEnv("cookie.path", "BAP_COOKIE_PATH")
-	v.BindEnv("cookie.secure", "BAP_COOKIE_SECURE")
-	v.BindEnv("cookie.http_only", "BAP_COOKIE_HTTP_ONLY")
-	v.BindEnv("cookie.max_age", "BAP_COOKIE_MAX_AGE")
-	v.BindEnv("cookie.same_site", "BAP_COOKIE_SAME_SITE")
+	_ = v.BindEnv("cookie.name", "BAP_COOKIE_NAME")
+	_ = v.BindEnv("cookie.secret_key", "BAP_COOKIE_SECRET_KEY")
+	_ = v.BindEnv("cookie.block_key", "BAP_COOKIE_BLOCK_KEY")
+	_ = v.BindEnv("cookie.domain", "BAP_COOKIE_DOMAIN")
+	_ = v.BindEnv("cookie.path", "BAP_COOKIE_PATH")
+	_ = v.BindEnv("cookie.secure", "BAP_COOKIE_SECURE")
+	_ = v.BindEnv("cookie.http_only", "BAP_COOKIE_HTTP_ONLY")
+	_ = v.BindEnv("cookie.max_age", "BAP_COOKIE_MAX_AGE")
+	_ = v.BindEnv("cookie.same_site", "BAP_COOKIE_SAME_SITE")
 
 	// Bind upstreams as strings to be processed later
-	v.BindEnv("upstreams.0.url", "BAP_UPSTREAM_URL")
-	v.BindEnv("upstreams.0.timeout", "BAP_UPSTREAM_TIMEOUT")
+	_ = v.BindEnv("upstreams.0.url", "BAP_UPSTREAM_URL")
+	_ = v.BindEnv("upstreams.0.timeout", "BAP_UPSTREAM_TIMEOUT")
 }
 
 // processURLs handles parsing of URL strings from config and environment variables

@@ -3,6 +3,7 @@ proxy:
   port: 8080
   prefix: "/_auth/"
   timeout: 30  # Timeout in seconds
+  # trusted_ips: ["127.0.0.1/32", "10.0.0.0/16"]  # CIDRs of trusted upstream proxies
 
 upstreams:
   - url: "http://nagios_legacy:80/"

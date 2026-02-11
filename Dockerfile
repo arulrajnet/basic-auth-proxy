@@ -1,7 +1,7 @@
 # Docker multi-stage build
 # Use the default platform for the build stage
 # hadolint ignore=DL3029
-FROM --platform=linux/amd64 golang:1.24.4-bookworm AS base
+FROM --platform=linux/amd64 golang:1.25.7-bookworm AS base
 
 ARG GIT_COMMIT=unspecified
 ARG BUILD_IMAGE_ID=unspecified
