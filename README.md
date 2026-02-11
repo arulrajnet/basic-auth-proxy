@@ -117,6 +117,9 @@ proxy:
   port: 8080
   prefix: "/_auth/"
   timeout: 30
+  trusted_ips:  # List of trusted upstream proxy CIDRs
+    - "127.0.0.1/32"
+    - "10.0.0.0/16"
 
 upstreams:
   - url: "http://localhost:8081"
@@ -157,6 +160,7 @@ Options:
   -B, --cookie-block string   Cookie block key (encryption key, must be 32 bytes)
   -L, --logo string           Path or URL for login page logo
   -T, --template-dir string   Path to custom login template
+  -t, --trusted-ips strings   Trusted upstream proxy CIDRs (e.g. 127.0.0.1/32,10.0.0.0/16)
   -f, --footer-text string    Footer text for login page
   -v, --version               Print version information
   -h, --help                  Show help message
@@ -171,7 +175,7 @@ Options:
 - [ ] Support for Let's Encrypt automatic certificate management. Integrate lego.
 - [ ] Support for multiple upstream services.
 - [ ] Support for configurable all settings via flags and environmental variables.
-- [ ] Run behind another reverse proxy (X-Forwarded-For support).
+- [x] Run behind another reverse proxy (X-Forwarded-For support via `trusted_ips`).
 
 
 
