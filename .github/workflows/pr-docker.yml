@@ -27,6 +27,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -56,7 +57,7 @@ jobs:
         with:
           context: .
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/arm/v5,linux/386,linux/ppc64le,linux/s390x,linux/riscv64
-          push: true
+          push: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
@@ -67,6 +68,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Comment PR with image info
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         uses: actions/github-script@v7
         with:
           script: |
@@ -89,6 +91,28 @@ jobs:
             \`\`\`bash
             docker run --rm -p 8080:8080 ${fullImage}
             \`\`\``;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Comment on fork PR
+        if: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const comment = `👋 **Thank you for your contribution!**
+
+            This PR is from a fork, so the Docker image was not automatically pushed to Docker Hub.
+
+            **For maintainers:** After reviewing and approving this PR, you can manually build and push a Docker image using the \`Push Fork PR Docker Image\` workflow:
+            1. Go to the [Actions tab](https://github.com/${{ github.repository }}/actions/workflows/push-fork-pr-image.yml)
+            2. Click "Run workflow"
+            3. Enter the PR number: **${{ github.event.number }}**
+            4. The workflow will build and push the image after verifying authorization (requires either the \`ok-to-push-image\` label or an approved review)`;
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,

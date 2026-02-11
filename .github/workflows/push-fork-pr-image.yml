@@ -1,0 +1,247 @@
+name: Push Fork PR Docker Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Pull Request number'
+        required: true
+        type: number
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: arulrajnet/basic-auth-proxy
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Get PR details
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: ${{ inputs.pr_number }}
+            });
+            
+            console.log('PR Details:');
+            console.log(`  Title: ${pr.title}`);
+            console.log(`  Author: ${pr.user.login}`);
+            console.log(`  Head Repo: ${pr.head.repo ? pr.head.repo.full_name : 'deleted'}`);
+            console.log(`  Base Repo: ${pr.base.repo.full_name}`);
+            console.log(`  State: ${pr.state}`);
+            console.log(`  Head SHA: ${pr.head.sha}`);
+            
+            // Check if PR is from a fork (handle deleted repos)
+            const isFork = pr.head.repo && pr.head.repo.full_name !== pr.base.repo.full_name;
+            core.setOutput('is_fork', isFork);
+            core.setOutput('head_sha', pr.head.sha);
+            core.setOutput('head_ref', pr.head.ref);
+            core.setOutput('head_repo', pr.head.repo ? pr.head.repo.full_name : 'deleted');
+            core.setOutput('state', pr.state);
+            core.setOutput('title', pr.title);
+
+      - name: Check PR state
+        id: state_check
+        run: |
+          if [ "${{ steps.pr.outputs.state }}" != "open" ]; then
+            echo "⚠️ **Warning: This PR is not open**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**PR State:** ${{ steps.pr.outputs.state }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Building Docker images for closed or merged PRs may waste resources." >> $GITHUB_STEP_SUMMARY
+            echo "Consider only building images for open PRs." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Stopping workflow to prevent unnecessary resource usage." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      - name: Check if PR is from fork
+        id: fork_check
+        run: |
+          if [ "${{ steps.pr.outputs.is_fork }}" = "false" ]; then
+            echo "⏭️ **This PR is NOT from a fork**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "This workflow is specifically designed for fork PRs where Docker Hub secrets are not available in the PR workflow." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**PR Details:**" >> $GITHUB_STEP_SUMMARY
+            echo "- **Title:** ${{ steps.pr.outputs.title }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Repository:** ${{ steps.pr.outputs.head_repo }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Same as base:** Yes (not a fork)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "ℹ️ **Action Required:** Same-repository PRs are automatically handled by the normal PR Docker workflow (`.github/workflows/pr-docker.yml`)." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**No further action needed** - the Docker image should already be built by the standard PR workflow." >> $GITHUB_STEP_SUMMARY
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "✅ **This PR is from a fork**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**PR Details:**" >> $GITHUB_STEP_SUMMARY
+            echo "- **Title:** ${{ steps.pr.outputs.title }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Fork Repository:** ${{ steps.pr.outputs.head_repo }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Base Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Proceeding with authorization checks..." >> $GITHUB_STEP_SUMMARY
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for ok-to-push-image label
+        if: steps.fork_check.outputs.skip == 'false'
+        id: label_check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ inputs.pr_number }}
+            });
+            
+            const hasLabel = labels.some(label => label.name === 'ok-to-push-image');
+            console.log(`Label 'ok-to-push-image' present: ${hasLabel}`);
+            
+            core.setOutput('has_label', hasLabel);
+
+      - name: Check for approved reviews
+        if: steps.fork_check.outputs.skip == 'false' && steps.label_check.outputs.has_label == 'false'
+        id: review_check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: reviews } = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: ${{ inputs.pr_number }}
+            });
+            
+            // Get the latest review from each reviewer (including dismissed reviews)
+            const latestReviews = {};
+            for (const review of reviews) {
+              const reviewer = review.user.login;
+              if (!latestReviews[reviewer] || new Date(review.submitted_at) > new Date(latestReviews[reviewer].submitted_at)) {
+                latestReviews[reviewer] = review;
+              }
+            }
+            
+            // Check if there's at least one approved review (dismissed reviews won't have state APPROVED)
+            const approvedReviews = Object.values(latestReviews).filter(review => review.state === 'APPROVED');
+            const hasApproval = approvedReviews.length > 0;
+            
+            console.log(`Total reviewers: ${Object.keys(latestReviews).length}`);
+            console.log(`Approved reviews: ${approvedReviews.length}`);
+            console.log(`Has at least one approval: ${hasApproval}`);
+            
+            core.setOutput('has_approval', hasApproval);
+
+      - name: Validate authorization
+        if: steps.fork_check.outputs.skip == 'false'
+        run: |
+          if [ "${{ steps.label_check.outputs.has_label }}" = "true" ]; then
+            echo "✅ **Authorization: APPROVED via label**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The PR has the \`ok-to-push-image\` label, proceeding with Docker build and push." >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.review_check.outputs.has_approval }}" = "true" ]; then
+            echo "✅ **Authorization: APPROVED via review**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The PR has at least one approved review, proceeding with Docker build and push." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Authorization: DENIED**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "This fork PR does not have the required authorization to build and push a Docker image." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Required (choose one):**" >> $GITHUB_STEP_SUMMARY
+            echo "1. Add the \`ok-to-push-image\` label to the PR, OR" >> $GITHUB_STEP_SUMMARY
+            echo "2. Approve the PR with a review" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Instructions for maintainers:**" >> $GITHUB_STEP_SUMMARY
+            echo "- To approve via label: Add the label \`ok-to-push-image\` to PR #${{ inputs.pr_number }}" >> $GITHUB_STEP_SUMMARY
+            echo "- To approve via review: Review and approve PR #${{ inputs.pr_number }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "After adding the label or approving, re-run this workflow." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      - name: Checkout PR head
+        if: steps.fork_check.outputs.skip == 'false'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        if: steps.fork_check.outputs.skip == 'false'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: steps.fork_check.outputs.skip == 'false'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Extract metadata
+        if: steps.fork_check.outputs.skip == 'false'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=pr-${{ inputs.pr_number }}
+
+      - name: Get version and build info
+        if: steps.fork_check.outputs.skip == 'false'
+        id: build_info
+        run: |
+          VERSION=$(git describe --tags --always 2>/dev/null || echo "pr-${{ inputs.pr_number }}")
+          GIT_COMMIT=${{ steps.pr.outputs.head_sha }}
+          BUILD_IMAGE_ID="${{ github.run_id }}-${{ github.run_number }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "git_commit=$GIT_COMMIT" >> $GITHUB_OUTPUT
+          echo "build_image_id=$BUILD_IMAGE_ID" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        if: steps.fork_check.outputs.skip == 'false'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/arm/v5,linux/386,linux/ppc64le,linux/s390x,linux/riscv64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.build_info.outputs.version }}
+            GIT_COMMIT=${{ steps.build_info.outputs.git_commit }}
+            BUILD_IMAGE_ID=${{ steps.build_info.outputs.build_image_id }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create build summary
+        if: steps.fork_check.outputs.skip == 'false'
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🐳 Docker Image Built Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${{ inputs.pr_number }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** \`pr-${{ inputs.pr_number }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ steps.pr.outputs.head_sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Platforms:** linux/amd64, linux/arm64, linux/arm/v7, linux/arm/v6, linux/arm/v5, linux/386, linux/ppc64le, linux/s390x, linux/riscv64" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Pull command:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${{ inputs.pr_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Run command:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "docker run --rm -p 8080:8080 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${{ inputs.pr_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
