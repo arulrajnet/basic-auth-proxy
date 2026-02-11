@@ -1,6 +1,6 @@
 on:
   pull_request_target:  # Instead of pull_request
-    types: [opened, reopened]
+    types: [opened]
 
 jobs:
   comment-only:
