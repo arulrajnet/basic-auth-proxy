@@ -87,8 +87,6 @@ func main() {
 	r.Use(proxy.RequestLogger(logger))
 
 	// Add auth routes
-	// Auth routes (these bypass session middleware check)
-	// r.PathPrefix(authPrefix + "/").Handler(proxyHandler)
 	r.PathPrefix("/").Handler(proxyHandler)
 
 	// Create server
