@@ -95,11 +95,35 @@ jobs:
           go-version-file: go.mod
 
       - name: Run go vet
-        run: go vet ./...
+        run: make vet
+
+  fmt:
+    name: Format Check
+    runs-on: ubuntu-latest, fmt
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::The following files need formatting:"
+            echo "$unformatted"
+            exit 1
+          fi
 
   summary:
     name: CI Summary
-    needs: [test, lint, vet]
+    needs: [test, lint, vet, fmt]
     runs-on: ubuntu-latest
     if: always()
 
@@ -125,4 +149,10 @@ jobs:
             echo "- ✅ **Vet**: Passed" >> $GITHUB_STEP_SUMMARY
           else
             echo "- ❌ **Vet**: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.fmt.result }}" = "success" ]; then
+            echo "- ✅ **Format**: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ **Format**: Failed (run 'make fmt' to fix)" >> $GITHUB_STEP_SUMMARY
           fi
