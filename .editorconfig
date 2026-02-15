@@ -22,3 +22,11 @@ insert_final_newline = true
 # end_of_line = crlf
 # For Linux/macOS:
 end_of_line = lf
+
+# Go files use tabs per gofmt standard
+[*.go]
+indent_style = tab
+
+# Makefiles require tabs
+[Makefile]
+indent_style = tab
