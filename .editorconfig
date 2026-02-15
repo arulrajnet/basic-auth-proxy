@@ -1,0 +1,32 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+[*]
+# 4 space indentation
+indent_style = space
+indent_size = 4
+
+# Character set
+charset = utf-8
+
+# Remove trailing whitespace
+trim_trailing_whitespace = true
+
+# Ensure files end with a newline
+insert_final_newline = true
+
+# Line endings (adjust based on your OS/team preference)
+# For Windows or cross-platform projects:
+# end_of_line = crlf
+# For Linux/macOS:
+end_of_line = lf
+
+# Go files use tabs per gofmt standard
+[*.go]
+indent_style = tab
+
+# Makefiles require tabs
+[Makefile]
+indent_style = tab

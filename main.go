@@ -1,3 +1,4 @@
+// Package main is the entry point for the basic-auth-proxy.
 package main
 
 import (
@@ -6,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"runtime"
-	"strings"
 	"time"
 
 	log "github.com/arulrajnet/basic-auth-proxy/pkg/logger"
@@ -33,6 +33,7 @@ func main() {
 	pflag.StringP("address", "a", "", "address to listen on")
 	pflag.IntP("port", "p", 0, "port to listen on")
 	pflag.StringP("proxy-prefix", "P", "", "prefix path for the proxy")
+	pflag.StringSliceP("trusted-ips", "t", []string{}, "list of trusted upstream proxy CIDRs (e.g. 127.0.0.1/32,10.0.0.0/16)")
 	pflag.StringP("upstream", "u", "", "upstream server URL")
 	pflag.StringP("cookie-name", "s", "", "cookie name")
 	pflag.StringP("cookie-secret", "S", "", "cookie secret key")
@@ -86,14 +87,6 @@ func main() {
 	r.Use(proxy.RequestLogger(logger))
 
 	// Add auth routes
-	authPrefix := cfg.Proxy.ProxyPrefix
-	if authPrefix == "" {
-		authPrefix = "/auth"
-	}
-	authPrefix = strings.TrimSuffix(authPrefix, "/")
-
-	// Auth routes (these bypass session middleware check)
-	// r.PathPrefix(authPrefix + "/").Handler(proxyHandler)
 	r.PathPrefix("/").Handler(proxyHandler)
 
 	// Create server
