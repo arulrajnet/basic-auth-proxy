@@ -118,18 +118,9 @@ func TestProxyTrustedIPs(t *testing.T) {
 
 			// Verification
 			if tt.shouldTrust {
-				// Trusted: XFF should include the original header plus the client IP host
-				clientIPNoPort := tt.clientIP
-				if host, _, err := net.SplitHostPort(tt.clientIP); err == nil {
-					clientIPNoPort = host
-				}
-				expectedXFFTrusted := clientIPNoPort
-				if tt.xffIncoming != "" {
-					expectedXFFTrusted = tt.xffIncoming + ", " + clientIPNoPort
-				}
-
-				if gotXFF != expectedXFFTrusted {
-					t.Errorf("Trusted: expected XFF %q, got %q", expectedXFFTrusted, gotXFF)
+				// Trusted: preserved
+				if gotXFF != tt.xffIncoming {
+					t.Errorf("Trusted: expected XFF %q, got %q", tt.xffIncoming, gotXFF)
 				}
 				if gotRealIP != tt.realIPIncoming {
 					t.Errorf("Trusted: expected RealIP %q, got %q", tt.realIPIncoming, gotRealIP)
