@@ -3,6 +3,7 @@ package proxy
 
 import (
 	"embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -234,6 +235,7 @@ func (p *Proxy) handleSignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	case http.MethodPost:
 		// Process login form
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB limit to prevent memory exhaustion
 		err := r.ParseForm()
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to parse login form")
@@ -322,18 +324,26 @@ func (p *Proxy) handleSignOut(w http.ResponseWriter, r *http.Request) {
 
 // Handle user_info requests
 func (p *Proxy) handleUserInfo(w http.ResponseWriter, r *http.Request) {
-	// Get user info from session
-	userInfoJSON, err := p.sessionManager.GetUserInfoJSON(r, p.config.Cookie.Name)
+	userInfo, err := p.sessionManager.GetUserInfo(r, p.config.Cookie.Name)
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to get user info")
 		http.Error(w, "Not Authenticated", http.StatusUnauthorized)
 		return
 	}
 
-	// Return user info as JSON
-	w.Header().Set("Content-Type", "application/json")
+	response := struct {
+		Username string    `json:"username"`
+		LoggedIn time.Time `json:"logged_in"`
+	}{
+		Username: userInfo.Username,
+		LoggedIn: userInfo.LoggedIn,
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(userInfoJSON)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.Error().Err(err).Msg("Failed to encode user info response")
+	}
 }
 
 // Serve the login page
