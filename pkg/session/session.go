@@ -4,7 +4,6 @@ package session
 import (
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -194,21 +193,3 @@ func (m *SessionManager) Destroy(w http.ResponseWriter, r *http.Request, name st
 	return session.Save(r, w)
 }
 
-// GetUserInfoJSON returns user info as JSON
-func (m *SessionManager) GetUserInfoJSON(r *http.Request, sessionName string) ([]byte, error) {
-	userInfo, err := m.GetUserInfo(r, sessionName)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create a response object without the password field
-	userResponse := struct {
-		Username string    `json:"username"`
-		LoggedIn time.Time `json:"logged_in"`
-	}{
-		Username: userInfo.Username,
-		LoggedIn: userInfo.LoggedIn,
-	}
-
-	return json.Marshal(userResponse)
-}
