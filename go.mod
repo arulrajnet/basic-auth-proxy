@@ -1,6 +1,6 @@
 module github.com/arulrajnet/basic-auth-proxy
 
-go 1.25.7
+go 1.25.8
 
 require (
 	github.com/gorilla/mux v1.8.1

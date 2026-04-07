@@ -7,7 +7,7 @@ GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
 GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
-GOLINT=golangci-lint
+GOLINT=$(shell go env GOPATH)/bin/golangci-lint
 
 # Binary name
 BINARY_NAME=basic-auth-proxy

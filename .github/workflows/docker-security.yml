@@ -22,6 +22,7 @@ env:
 jobs:
   dockerfile-lint:
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' || github.event.repository.fork == false
     permissions:
       contents: read
       security-events: write
@@ -45,6 +46,7 @@ jobs:
 
   security-scan:
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' || github.event.repository.fork == false
     permissions:
       contents: read
       security-events: write
@@ -107,6 +109,7 @@ jobs:
 
   best-practices:
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' || github.event.repository.fork == false
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -177,7 +180,7 @@ jobs:
 
   image-analysis:
     runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' || github.event.repository.fork == false
 
     steps:
       - name: Checkout repository
